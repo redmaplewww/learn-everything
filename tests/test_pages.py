@@ -86,8 +86,14 @@ class TestPathGeneratorPageLogic:
 
         assert md.index("[2.1]") < md.index("[2.2]") < md.index("[2.10]")
 
-    def test_refresh_projects_returns_list(self, path_page):
-        assert isinstance(path_page._refresh_projects(), list)
+    def test_refresh_projects_returns_scrollable_html(self, path_page):
+        projects_html = path_page._refresh_projects()
+        details_html = path_page._refresh_project_details()
+
+        assert isinstance(projects_html, str)
+        assert "project-table" in projects_html
+        assert isinstance(details_html, str)
+        assert "project-detail-list" in details_html
 
     def test_path_page_exposes_route_import_export_controls(self):
         from learning_ext.pages.path_generator import PathGeneratorPage
