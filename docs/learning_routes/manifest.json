@@ -1,6 +1,15 @@
 {
   "routes": [
     {
+      "id": "ai_agent_systems_opencode_deepreason",
+      "title": "AI Agent 系统实战路线：OpenCode / DeepReason / RAG / MCP",
+      "topic": "My goal is to develop a practical beginner-to-intermediate understanding of AI agent systems by studying the DeepReason Agents Framework repository. I want to understand what separates an agent from a chatbot; how models, prompts, tools, permissions, state, sessions, and agent loops work together; and how primary agents and subagents collaborate. I want to learn OpenCode’s native architecture, including AGENTS.md, opencode.json, custom agents, skills, commands, permissions, sessions, and MCP integrations. I also want to understand the concepts demonstrated by the repository’s older Python implementation: workflow/state-machine execution, multi-agent orchestration, RAG, evidence tracking, risk gates, short- and long-term memory, evaluation, and proposal-based self-improvement. I want to compare OpenCode conceptually with Codex and Claude Code, understand when to use upstream tools instead of custom framework code, and finish by configuring and operating the repository, creating one specialized agent, creating one reusable skill, connecting one safe MCP server, running the Python tests, and designing a small evidence-first agent workflow of my own. I do not need to learn how to build an entire agent runtime from scratch.",
+      "description": "面向有中级 Python/C++ 基础、AI Agent 初学到进阶学习者的 80 小时路线，围绕 OpenCode、DeepReason、RAG、MCP、证据链和失败回退完成一个 research agent 项目。",
+      "nodes": 26,
+      "total_hours": 80.0,
+      "file": "docs/learning_routes/ai_agent_systems_opencode_deepreason_roadmap.json"
+    },
+    {
       "project_id": 1,
       "title": "修订后的学习路线从Agent系统全景架构概述开始，依次覆盖硬件基础、驱动与OS、LLM原理与训练、模型优化与部署、Agent核心概念与集成、微调实践、系统设计与",
       "topic": "我希望学习Agent从硬件到驱动到LLM到软件到Agent的完整架构，我是一个项目的首席科学家，我不太需要深入到具体的技术细节，但是我要对这个有一个完整的了解",

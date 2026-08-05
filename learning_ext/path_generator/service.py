@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 from sqlalchemy.orm import Session
@@ -31,6 +32,9 @@ from learning_ext.project_ops import clear_project_learning_data
 
 ROADMAP_BUNDLE_KIND = "learn-everything.roadmap"
 ROADMAP_BUNDLE_SCHEMA_VERSION = 1
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+BUILTIN_ROADMAPS_DIR = _REPO_ROOT / "docs" / "learning_routes"
+BUILTIN_ROADMAPS_MANIFEST = BUILTIN_ROADMAPS_DIR / "manifest.json"
 
 
 def generate_roadmap(
@@ -294,6 +298,71 @@ def import_roadmap_bundle(
         weekly_hours=float(project_data.get("weekly_hours") or 10.0),
         roadmap=roadmap,
         title=str(project_data.get("title") or roadmap.get("summary") or topic),
+    )
+
+
+def list_builtin_roadmaps() -> list[dict]:
+    """List learning route bundles shipped with the application."""
+    if not BUILTIN_ROADMAPS_MANIFEST.exists():
+        return []
+    try:
+        manifest = json.loads(BUILTIN_ROADMAPS_MANIFEST.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise ValueError(f"内置学习路线清单解析失败: {e}") from e
+
+    routes = []
+    for item in manifest.get("routes", []) or []:
+        if not isinstance(item, dict):
+            continue
+        file_value = str(item.get("file") or "").strip()
+        if not file_value:
+            continue
+        route_id = str(item.get("id") or Path(file_value).stem).strip()
+        if not route_id:
+            continue
+        route = dict(item)
+        route["id"] = route_id
+        route["file"] = file_value
+        routes.append(route)
+    return routes
+
+
+def load_builtin_roadmap_bundle(route_id: str) -> dict:
+    """Load a bundled learning route by manifest id."""
+    requested = str(route_id or "").strip()
+    if not requested:
+        raise ValueError("请选择内置学习路线")
+
+    route = next((r for r in list_builtin_roadmaps() if r["id"] == requested), None)
+    if route is None:
+        raise ValueError(f"内置学习路线不存在: {requested}")
+
+    route_path = (_REPO_ROOT / route["file"]).resolve()
+    if BUILTIN_ROADMAPS_DIR.resolve() not in route_path.parents:
+        raise ValueError(f"内置学习路线路径不安全: {route['file']}")
+    if not route_path.exists():
+        raise ValueError(f"内置学习路线文件不存在: {route['file']}")
+
+    try:
+        data = json.loads(route_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise ValueError(f"内置学习路线 JSON 解析失败: {e}") from e
+
+    if data.get("kind") == ROADMAP_BUNDLE_KIND:
+        _validate_roadmap_for_exchange(data.get("roadmap") or {})
+    else:
+        _validate_roadmap_for_exchange(data)
+    return data
+
+
+def import_builtin_roadmap(
+    session: Session, route_id: str, *, user_id: str = "default"
+) -> LearningProject:
+    """Import a shipped learning route as a new project."""
+    return import_roadmap_bundle(
+        session=session,
+        payload=load_builtin_roadmap_bundle(route_id),
+        user_id=user_id,
     )
 
 

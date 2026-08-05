@@ -14,6 +14,8 @@
 
 from __future__ import annotations
 
+import io
+import zipfile
 from datetime import datetime, timedelta
 
 import pytest
@@ -27,7 +29,11 @@ from learning_ext.db.models import (
     ReviewLog,
     Task,
 )
-from learning_ext.exporter import export_markdown, export_progress_report
+from learning_ext.exporter import (
+    export_learning_plan_docx,
+    export_markdown,
+    export_progress_report,
+)
 from learning_ext.fsrs_review import (
     RATING_AGAIN,
     RATING_EASY,
@@ -353,6 +359,42 @@ class TestExport:
         assert (
             html.index("[2.1]") < html.index("[2.2]") < html.index("[2.10]")
         )
+
+    def test_export_learning_plan_docx_contains_route_content(self, session):
+        roadmap = {
+            "summary": "AI Agent 系统实战路线",
+            "stages": [{"name": "基础阶段", "stage": "base", "goal": "概念打底"}],
+            "nodes": [
+                {
+                    "code": "1.1",
+                    "title": "AI Agent 与 Chatbot 的区别",
+                    "description": "理解 Agent 的行动能力。",
+                    "stage": "base",
+                    "est_hours": 2,
+                    "difficulty": 2,
+                    "prerequisites": [],
+                }
+            ],
+        }
+        project = save_roadmap(
+            session,
+            user_id="default",
+            topic="AI Agent",
+            background="会 Python",
+            goal="做一个 evidence-first research agent",
+            weekly_hours=10,
+            roadmap=roadmap,
+            title="AI Agent 系统实战路线",
+        )
+
+        docx_bytes = export_learning_plan_docx(session, project.id)
+
+        assert docx_bytes.startswith(b"PK")
+        with zipfile.ZipFile(io.BytesIO(docx_bytes)) as zf:
+            document_xml = zf.read("word/document.xml").decode("utf-8")
+        assert "AI Agent 系统实战路线" in document_xml
+        assert "基础阶段" in document_xml
+        assert "AI Agent 与 Chatbot 的区别" in document_xml
 
 
 class TestAutoSetup:

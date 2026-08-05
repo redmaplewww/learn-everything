@@ -21,7 +21,9 @@ from learning_ext.path_generator import (
     audit_and_rewrite_roadmap,
     export_roadmap_bundle,
     generate_roadmap,
+    import_builtin_roadmap,
     import_roadmap_bundle,
+    list_builtin_roadmaps,
     load_roadmap,
     refine_roadmap,
     replace_project_roadmap,
@@ -130,6 +132,17 @@ class PathGeneratorPage(BasePage):
             gr.Markdown(
                 "导出会生成格式化 JSON 文件，包含项目元信息和完整路线；导入会新建一个学习项目。"
             )
+            builtin_choices = self._builtin_roadmap_choices()
+            if builtin_choices:
+                with gr.Row():
+                    self.builtin_roadmap = gr.Dropdown(
+                        label="内置学习路线",
+                        choices=builtin_choices,
+                        value=builtin_choices[0][1],
+                    )
+                    self.import_builtin_roadmap_btn = gr.Button(
+                        "📚 导入内置路线", variant="primary"
+                    )
             with gr.Row():
                 self.export_project_id = gr.Number(
                     label="导出项目 ID", value=0, precision=0
@@ -247,6 +260,18 @@ class PathGeneratorPage(BasePage):
                 self.status,
             ],
         )
+        if hasattr(self, "import_builtin_roadmap_btn"):
+            self.import_builtin_roadmap_btn.click(
+                fn=self._handle_import_builtin_roadmap,
+                inputs=[self.builtin_roadmap],
+                outputs=[
+                    self.project_list,
+                    self.roadmap_output,
+                    self.roadmap_json,
+                    self.current_project_id,
+                    self.status,
+                ],
+            )
         self.delete_btn.click(
             fn=self._handle_delete_project,
             inputs=[self.delete_project_id, self.delete_confirm],
@@ -498,6 +523,40 @@ class PathGeneratorPage(BasePage):
             logger.exception("导入学习路线失败")
             return self._refresh_projects(), gr.update(), gr.update(), None, f"❌ 导入失败: {e}"
 
+    def _handle_import_builtin_roadmap(self, route_id):
+        """导入内置学习路线，创建新项目。"""
+        if not route_id:
+            return (
+                self._refresh_projects(),
+                gr.update(),
+                gr.update(),
+                None,
+                "⚠️ 请选择内置学习路线",
+            )
+        try:
+            with Session(engine) as session:
+                project = import_builtin_roadmap(
+                    session, str(route_id), user_id="default"
+                )
+                roadmap = load_roadmap(session, project.id)
+                md = self._roadmap_to_markdown(roadmap)
+                return (
+                    self._refresh_projects(),
+                    md,
+                    json.dumps(roadmap, ensure_ascii=False, indent=2),
+                    project.id,
+                    f"✅ 已导入内置学习路线并创建项目 #{project.id}",
+                )
+        except Exception as e:
+            logger.exception("导入内置学习路线失败")
+            return (
+                self._refresh_projects(),
+                gr.update(),
+                gr.update(),
+                None,
+                f"❌ 导入失败: {e}",
+            )
+
     def _handle_delete_project(self, project_id, confirm):
         """删除项目及其学习数据"""
         if not project_id or int(project_id) <= 0:
@@ -665,6 +724,23 @@ class PathGeneratorPage(BasePage):
             if value > 0 and value not in ids:
                 ids.append(value)
         return ids
+
+    @staticmethod
+    def _builtin_roadmap_choices() -> list[tuple[str, str]]:
+        choices = []
+        for route in list_builtin_roadmaps():
+            label = route.get("title") or route["id"]
+            nodes = route.get("nodes")
+            total_hours = route.get("total_hours")
+            details = []
+            if nodes:
+                details.append(f"{nodes} 节")
+            if total_hours:
+                details.append(f"{total_hours:g} 小时")
+            if details:
+                label = f"{label} ({' / '.join(details)})"
+            choices.append((label, route["id"]))
+        return choices
 
     def _refresh_projects(self):
         """刷新项目列表"""

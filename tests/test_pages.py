@@ -97,9 +97,12 @@ class TestPathGeneratorPageLogic:
 
         assert "导出学习路线" in ui_source
         assert "导入学习路线" in ui_source
+        assert "内置学习路线" in ui_source
+        assert "导入内置路线" in ui_source
         assert "gr.File" in ui_source
         assert "_handle_export_roadmap" in event_source
         assert "_handle_import_roadmap" in event_source
+        assert "_handle_import_builtin_roadmap" in event_source
 
 
 class TestSaveWithSetup:
