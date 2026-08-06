@@ -245,6 +245,239 @@ footer {display:none !important;}
     background: #F9FAFB !important;
 }
 
+/* Project list on the learning route page: scroll instead of stretching. */
+#learning-project-list,
+#learning-project-list.gradio-dataframe,
+#learning-project-list .gradio-dataframe,
+#learning-project-list .wrap,
+#learning-project-list .table-wrap,
+#learning-project-list .overflow-y-auto,
+#learning-project-list [data-testid="dataframe"] {
+    max-height: 150px !important;
+    overflow: auto !important;
+}
+#learning-project-list table {
+    min-width: 1180px !important;
+    table-layout: fixed !important;
+}
+#learning-project-list thead,
+#learning-project-list thead tr,
+#learning-project-list thead th {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 3 !important;
+}
+#learning-project-list th,
+#learning-project-list td {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+#learning-project-list th:nth-child(1),
+#learning-project-list td:nth-child(1) {
+    width: 64px !important;
+}
+#learning-project-list th:nth-child(2),
+#learning-project-list td:nth-child(2) {
+    width: 640px !important;
+}
+#learning-project-list th:nth-child(3),
+#learning-project-list td:nth-child(3) {
+    width: 220px !important;
+}
+#learning-project-list th:nth-child(4),
+#learning-project-list td:nth-child(4) {
+    width: 140px !important;
+}
+#learning-project-list-scroll {
+    max-width: 100% !important;
+    overflow: visible !important;
+    padding-bottom: 8px !important;
+    scrollbar-color: var(--le-primary) #E5E7EB !important;
+    scrollbar-width: auto !important;
+}
+#learning-project-list-scroll::-webkit-scrollbar {
+    height: 16px !important;
+}
+#learning-project-list-scroll::-webkit-scrollbar-track {
+    background: #E5E7EB !important;
+    border-radius: 999px !important;
+}
+#learning-project-list-scroll::-webkit-scrollbar-thumb {
+    background: var(--le-primary) !important;
+    border: 3px solid #E5E7EB !important;
+    border-radius: 999px !important;
+}
+#learning-project-list-scroll::-webkit-scrollbar-thumb:hover {
+    background: var(--le-primary-dark) !important;
+}
+#learning-project-list-scroll #learning-project-list,
+#learning-project-list-scroll #learning-project-list > div,
+#learning-project-list-scroll #learning-project-list .wrap,
+#learning-project-list-scroll #learning-project-list .table-wrap {
+    min-width: 1520px !important;
+}
+#learning-project-list .wrap,
+#learning-project-list .table-wrap {
+    max-height: 150px !important;
+    overflow-y: scroll !important;
+    scrollbar-gutter: stable !important;
+}
+#learning-project-list-scroll #learning-project-list th,
+#learning-project-list-scroll #learning-project-list td,
+#learning-project-list-scroll #learning-project-list button {
+    text-overflow: clip !important;
+}
+#learning-project-list .wrap::-webkit-scrollbar,
+#learning-project-list .table-wrap::-webkit-scrollbar {
+    width: 14px !important;
+    height: 14px !important;
+}
+#learning-project-list div[class*="table-wrap"] {
+    max-height: 150px !important;
+    overflow-y: scroll !important;
+    overflow-x: auto !important;
+}
+#learning-project-list div[class*="table-wrap"]::-webkit-scrollbar {
+    width: 14px !important;
+    height: 14px !important;
+}
+#learning-project-list .wrap::-webkit-scrollbar-track,
+#learning-project-list .table-wrap::-webkit-scrollbar-track,
+#learning-project-list div[class*="table-wrap"]::-webkit-scrollbar-track {
+    background: #E5E7EB !important;
+}
+#learning-project-list .wrap::-webkit-scrollbar-thumb,
+#learning-project-list .table-wrap::-webkit-scrollbar-thumb,
+#learning-project-list div[class*="table-wrap"]::-webkit-scrollbar-thumb {
+    background: var(--le-primary) !important;
+    border: 3px solid #E5E7EB !important;
+    border-radius: 999px !important;
+}
+#learning-project-list .wrap::-webkit-scrollbar-thumb:hover,
+#learning-project-list .table-wrap::-webkit-scrollbar-thumb:hover,
+#learning-project-list div[class*="table-wrap"]::-webkit-scrollbar-thumb:hover {
+    background: var(--le-primary-dark) !important;
+}
+.project-table-shell {
+    max-height: 170px;
+    max-width: 100%;
+    overflow: auto;
+    border: 1px solid var(--le-border);
+    border-radius: 8px;
+    background: var(--le-card);
+    scrollbar-color: var(--le-primary) #E5E7EB;
+    scrollbar-width: auto;
+}
+.project-table-shell::-webkit-scrollbar {
+    width: 14px;
+    height: 14px;
+}
+.project-table-shell::-webkit-scrollbar-track {
+    background: #E5E7EB;
+}
+.project-table-shell::-webkit-scrollbar-thumb {
+    background: var(--le-primary);
+    border: 3px solid #E5E7EB;
+    border-radius: 999px;
+}
+.project-table-shell::-webkit-scrollbar-thumb:hover {
+    background: var(--le-primary-dark);
+}
+.project-table {
+    min-width: 1450px;
+    width: max-content;
+    border-collapse: collapse;
+    table-layout: fixed;
+    font-size: 14px;
+}
+.project-table thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--le-primary) !important;
+    color: #fff !important;
+}
+.project-table th,
+.project-table td {
+    border-bottom: 1px solid var(--le-border);
+    padding: 10px 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: left;
+}
+.project-table tbody tr:nth-child(even) {
+    background: #F9FAFB;
+}
+.project-table th:nth-child(1),
+.project-table td:nth-child(1) {
+    width: 70px;
+}
+.project-table th:nth-child(2),
+.project-table td:nth-child(2) {
+    width: 680px;
+}
+.project-table th:nth-child(3),
+.project-table td:nth-child(3) {
+    width: 280px;
+}
+.project-table th:nth-child(4),
+.project-table td:nth-child(4) {
+    width: 150px;
+}
+.project-table th:nth-child(5),
+.project-table td:nth-child(5) {
+    width: 130px;
+}
+.project-table th:nth-child(6),
+.project-table td:nth-child(6) {
+    width: 180px;
+}
+.project-table-empty {
+    border: 1px solid var(--le-border);
+    border-radius: 8px;
+    color: var(--le-text-muted);
+    padding: 16px;
+    background: var(--le-card);
+}
+.project-detail-list {
+    margin-top: 12px;
+    border: 1px solid var(--le-border);
+    border-radius: 8px;
+    background: var(--le-card);
+    padding: 12px 14px;
+}
+.project-detail-list.muted {
+    color: var(--le-text-muted);
+}
+.project-detail-list h4 {
+    margin: 0 0 10px;
+    font-size: 15px;
+    color: var(--le-text);
+}
+.project-detail-list details {
+    border-top: 1px solid var(--le-border);
+    padding: 10px 0;
+}
+.project-detail-list details:first-of-type {
+    border-top: 0;
+}
+.project-detail-list summary {
+    cursor: pointer;
+    color: var(--le-primary-dark);
+    font-weight: 600;
+    line-height: 1.5;
+}
+.project-detail-body {
+    color: var(--le-text);
+    margin: 8px 0 0 20px;
+    line-height: 1.55;
+}
+.project-detail-body p {
+    margin: 5px 0;
+}
+
 /* ===== 指标卡片 ===== */
 .le-metric {
     display: inline-block;

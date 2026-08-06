@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+from html import escape
 from pathlib import Path
 from typing import Optional
 
@@ -21,7 +22,9 @@ from learning_ext.path_generator import (
     audit_and_rewrite_roadmap,
     export_roadmap_bundle,
     generate_roadmap,
+    import_builtin_roadmap,
     import_roadmap_bundle,
+    list_builtin_roadmaps,
     load_roadmap,
     refine_roadmap,
     replace_project_roadmap,
@@ -116,11 +119,14 @@ class PathGeneratorPage(BasePage):
             self.refine_btn = gr.Button("✏️ 按意见调整路线")
 
         gr.Markdown("---\n### 📂 我的学习项目")
-        self.project_list = gr.Dataframe(
-            headers=["ID", "标题", "选题", "进度", "状态", "创建时间"],
-            datatype=["number", "str", "str", "str", "str", "str"],
-            interactive=False,
-            value=[],
+        with gr.Column(elem_id="learning-project-list-scroll"):
+            self.project_list = gr.HTML(
+                value=self._refresh_projects(),
+                elem_id="learning-project-table",
+            )
+        self.project_details = gr.HTML(
+            value=self._refresh_project_details(),
+            elem_id="learning-project-details",
         )
         with gr.Row():
             self.refresh_btn = gr.Button("🔄 刷新项目列表")
@@ -130,6 +136,17 @@ class PathGeneratorPage(BasePage):
             gr.Markdown(
                 "导出会生成格式化 JSON 文件，包含项目元信息和完整路线；导入会新建一个学习项目。"
             )
+            builtin_choices = self._builtin_roadmap_choices()
+            if builtin_choices:
+                with gr.Row():
+                    self.builtin_roadmap = gr.Dropdown(
+                        label="内置学习路线",
+                        choices=builtin_choices,
+                        value=builtin_choices[0][1],
+                    )
+                    self.import_builtin_roadmap_btn = gr.Button(
+                        "📚 导入内置路线", variant="primary"
+                    )
             with gr.Row():
                 self.export_project_id = gr.Number(
                     label="导出项目 ID", value=0, precision=0
@@ -182,8 +199,8 @@ class PathGeneratorPage(BasePage):
             ],
             outputs=[self.roadmap_output, self.roadmap_json, self.status],
         ).then(
-            fn=self._refresh_projects,
-            outputs=[self.project_list],
+            fn=self._refresh_project_views,
+            outputs=[self.project_list, self.project_details],
         )
 
         self.regenerate_btn.click(
@@ -215,11 +232,14 @@ class PathGeneratorPage(BasePage):
             ],
             outputs=[self.current_project_id, self.save_progress, self.status],
         ).then(
-            fn=self._refresh_projects,
-            outputs=[self.project_list],
+            fn=self._refresh_project_views,
+            outputs=[self.project_list, self.project_details],
         )
 
-        self.refresh_btn.click(fn=self._refresh_projects, outputs=[self.project_list])
+        self.refresh_btn.click(
+            fn=self._refresh_project_views,
+            outputs=[self.project_list, self.project_details],
+        )
 
         self.load_btn.click(
             fn=self._handle_load,
@@ -241,22 +261,37 @@ class PathGeneratorPage(BasePage):
             inputs=[self.import_roadmap_file],
             outputs=[
                 self.project_list,
+                self.project_details,
                 self.roadmap_output,
                 self.roadmap_json,
                 self.current_project_id,
                 self.status,
             ],
         )
+        if hasattr(self, "import_builtin_roadmap_btn"):
+            self.import_builtin_roadmap_btn.click(
+                fn=self._handle_import_builtin_roadmap,
+                inputs=[self.builtin_roadmap],
+                outputs=[
+                    self.project_list,
+                    self.project_details,
+                    self.roadmap_output,
+                    self.roadmap_json,
+                    self.current_project_id,
+                    self.status,
+                ],
+            )
         self.delete_btn.click(
             fn=self._handle_delete_project,
             inputs=[self.delete_project_id, self.delete_confirm],
-            outputs=[self.project_list, self.status],
+            outputs=[self.project_list, self.project_details, self.status],
         )
         self.audit_project_btn.click(
             fn=self._handle_audit_project,
             inputs=[self.audit_project_id],
             outputs=[
                 self.project_list,
+                self.project_details,
                 self.roadmap_output,
                 self.roadmap_json,
                 self.audit_project_output,
@@ -479,7 +514,13 @@ class PathGeneratorPage(BasePage):
     def _handle_import_roadmap(self, file_obj):
         """导入格式化学习路线 JSON，创建新项目。"""
         if file_obj is None:
-            return self._refresh_projects(), gr.update(), gr.update(), None, "⚠️ 请先选择 JSON 文件"
+            return (
+                *self._refresh_project_views(),
+                gr.update(),
+                gr.update(),
+                None,
+                "⚠️ 请先选择 JSON 文件",
+            )
         try:
             path = getattr(file_obj, "name", None) or str(file_obj)
             payload = Path(path).read_text(encoding="utf-8")
@@ -488,7 +529,7 @@ class PathGeneratorPage(BasePage):
                 roadmap = load_roadmap(session, project.id)
                 md = self._roadmap_to_markdown(roadmap)
                 return (
-                    self._refresh_projects(),
+                    *self._refresh_project_views(),
                     md,
                     json.dumps(roadmap, ensure_ascii=False, indent=2),
                     project.id,
@@ -496,14 +537,54 @@ class PathGeneratorPage(BasePage):
                 )
         except Exception as e:
             logger.exception("导入学习路线失败")
-            return self._refresh_projects(), gr.update(), gr.update(), None, f"❌ 导入失败: {e}"
+            return (
+                *self._refresh_project_views(),
+                gr.update(),
+                gr.update(),
+                None,
+                f"❌ 导入失败: {e}",
+            )
+
+    def _handle_import_builtin_roadmap(self, route_id):
+        """导入内置学习路线，创建新项目。"""
+        if not route_id:
+            return (
+                *self._refresh_project_views(),
+                gr.update(),
+                gr.update(),
+                None,
+                "⚠️ 请选择内置学习路线",
+            )
+        try:
+            with Session(engine) as session:
+                project = import_builtin_roadmap(
+                    session, str(route_id), user_id="default"
+                )
+                roadmap = load_roadmap(session, project.id)
+                md = self._roadmap_to_markdown(roadmap)
+                return (
+                    *self._refresh_project_views(),
+                    md,
+                    json.dumps(roadmap, ensure_ascii=False, indent=2),
+                    project.id,
+                    f"✅ 已导入内置学习路线并创建项目 #{project.id}",
+                )
+        except Exception as e:
+            logger.exception("导入内置学习路线失败")
+            return (
+                *self._refresh_project_views(),
+                gr.update(),
+                gr.update(),
+                None,
+                f"❌ 导入失败: {e}",
+            )
 
     def _handle_delete_project(self, project_id, confirm):
         """删除项目及其学习数据"""
         if not project_id or int(project_id) <= 0:
-            return self._refresh_projects(), "⚠️ 请输入有效的项目 ID"
+            return *self._refresh_project_views(), "⚠️ 请输入有效的项目 ID"
         if (confirm or "").strip() != "DELETE":
-            return self._refresh_projects(), "⚠️ 如需删除，请在确认文本中输入 DELETE"
+            return *self._refresh_project_views(), "⚠️ 如需删除，请在确认文本中输入 DELETE"
         try:
             from learning_ext.project_ops import delete_project
 
@@ -512,12 +593,12 @@ class PathGeneratorPage(BasePage):
             deleted = result["deleted"]
             total = sum(deleted.values())
             return (
-                self._refresh_projects(),
+                *self._refresh_project_views(),
                 f"✅ 已删除项目 #{int(project_id)}，清理 {total} 条相关数据",
             )
         except Exception as e:
             logger.exception("删除项目失败")
-            return self._refresh_projects(), f"❌ 删除失败: {e}"
+            return *self._refresh_project_views(), f"❌ 删除失败: {e}"
 
     def _handle_audit_project(self, project_id):
         """审计旧项目路线，替换路线并批量重生成课程内容。"""
@@ -534,7 +615,7 @@ class PathGeneratorPage(BasePage):
                     ]
                 if not project_ids:
                     return (
-                        self._refresh_projects(),
+                        *self._refresh_project_views(),
                         gr.update(),
                         gr.update(),
                         "⚠️ 当前没有可审计的项目",
@@ -586,7 +667,7 @@ class PathGeneratorPage(BasePage):
                     f"课程内容已排队强制重生成：{result['queued']} 节。"
                 )
                 return (
-                    self._refresh_projects(),
+                    *self._refresh_project_views(),
                     f"{result['audit_md']}\n\n---\n\n{result['roadmap_md']}",
                     json.dumps(result["roadmap"], ensure_ascii=False, indent=2),
                     result["audit_md"],
@@ -631,7 +712,7 @@ class PathGeneratorPage(BasePage):
                 f"课程内容已排队强制重生成：{total_queued} 节。"
             )
             return (
-                self._refresh_projects(),
+                *self._refresh_project_views(),
                 roadmap_md,
                 json.dumps(payload, ensure_ascii=False, indent=2),
                 audit_report,
@@ -640,7 +721,7 @@ class PathGeneratorPage(BasePage):
         except Exception as e:
             logger.exception("项目路线审计失败")
             return (
-                self._refresh_projects(),
+                *self._refresh_project_views(),
                 gr.update(),
                 gr.update(),
                 f"❌ 审计失败: {e}",
@@ -666,6 +747,23 @@ class PathGeneratorPage(BasePage):
                 ids.append(value)
         return ids
 
+    @staticmethod
+    def _builtin_roadmap_choices() -> list[tuple[str, str]]:
+        choices = []
+        for route in list_builtin_roadmaps():
+            label = route.get("title") or route["id"]
+            nodes = route.get("nodes")
+            total_hours = route.get("total_hours")
+            details = []
+            if nodes:
+                details.append(f"{nodes} 节")
+            if total_hours:
+                details.append(f"{total_hours:g} 小时")
+            if details:
+                label = f"{label} ({' / '.join(details)})"
+            choices.append((label, route["id"]))
+        return choices
+
     def _refresh_projects(self):
         """刷新项目列表"""
         try:
@@ -677,22 +775,104 @@ class PathGeneratorPage(BasePage):
                     .order_by(LearningProject.id.desc())
                     .limit(50)
                 ).all()
-                rows = []
+                rows = [
+                    '<div class="project-table-shell">',
+                    '<table class="project-table">',
+                    "<thead><tr>"
+                    "<th>ID</th><th>标题</th><th>选题</th>"
+                    "<th>进度</th><th>状态</th><th>创建时间</th>"
+                    "</tr></thead>",
+                    "<tbody>",
+                ]
                 for p in projects:
                     prog = get_project_progress(session, p.id)
+                    progress = f"{prog['done']}/{prog['total']} ({prog['pct']}%)"
                     rows.append(
-                        [
-                            p.id,
-                            p.title,
-                            p.topic[:40],
-                            f"{prog['done']}/{prog['total']} ({prog['pct']}%)",
-                            p.status,
-                            p.created_at.strftime("%Y-%m-%d %H:%M"),
-                        ]
+                        "<tr>"
+                        f"<td>{p.id}</td>"
+                        f'<td title="{escape(p.title or "")}">{escape(p.title or "")}</td>'
+                        f'<td title="{escape(p.topic or "")}">{escape(p.topic or "")}</td>'
+                        f"<td>{escape(progress)}</td>"
+                        f"<td>{escape(p.status or '')}</td>"
+                        f"<td>{p.created_at.strftime('%Y-%m-%d %H:%M')}</td>"
+                        "</tr>"
                     )
-                return rows
+                rows.append("</tbody></table></div>")
+                return "\n".join(rows)
         except Exception:
-            return []
+            return '<div class="project-table-empty">项目列表加载失败。</div>'
+
+    def _refresh_project_views(self):
+        return self._refresh_projects(), self._refresh_project_details()
+
+    def _refresh_project_details(self):
+        try:
+            from learning_ext.progress.study import get_project_progress
+
+            with Session(engine) as session:
+                projects = session.exec(
+                    select(LearningProject)
+                    .order_by(LearningProject.id.desc())
+                    .limit(50)
+                ).all()
+
+                if not projects:
+                    return (
+                        '<div class="project-detail-list muted">'
+                        "暂无学习项目。生成或导入路线后，这里会显示可展开详情。"
+                        "</div>"
+                    )
+
+                cards = ['<div class="project-detail-list">']
+                cards.append("<h4>项目详情（点击 ID 展开）</h4>")
+                for p in projects:
+                    progress = get_project_progress(session, p.id)
+                    try:
+                        roadmap = json.loads(p.roadmap_json or "{}")
+                    except Exception:
+                        roadmap = {}
+                    node_count = len(roadmap.get("nodes") or [])
+                    summary = roadmap.get("summary") or p.title or ""
+                    cards.append(
+                        "\n".join(
+                            [
+                                "<details>",
+                                (
+                                    "<summary>"
+                                    f"<strong>#{p.id}</strong> "
+                                    f"{escape(p.title or '未命名项目')}"
+                                    "</summary>"
+                                ),
+                                '<div class="project-detail-body">',
+                                f"<p><b>完整标题：</b>{escape(p.title or '')}</p>",
+                                f"<p><b>选题：</b>{escape(p.topic or '')}</p>",
+                                (
+                                    "<p><b>进度：</b>"
+                                    f"{progress['done']}/{progress['total']} "
+                                    f"({progress['pct']}%)</p>"
+                                ),
+                                f"<p><b>状态：</b>{escape(p.status or '')}</p>",
+                                (
+                                    "<p><b>创建时间：</b>"
+                                    f"{p.created_at.strftime('%Y-%m-%d %H:%M')}</p>"
+                                ),
+                                f"<p><b>节点数：</b>{node_count}</p>",
+                                f"<p><b>目标：</b>{escape(p.goal or '未填写')}</p>",
+                                f"<p><b>背景：</b>{escape(p.background or '未填写')}</p>",
+                                f"<p><b>路线摘要：</b>{escape(summary)}</p>",
+                                "</div>",
+                                "</details>",
+                            ]
+                        )
+                    )
+                cards.append("</div>")
+                return "\n".join(cards)
+        except Exception as e:
+            return (
+                '<div class="project-detail-list muted">'
+                f"项目详情加载失败：{escape(str(e))}"
+                "</div>"
+            )
 
     @staticmethod
     def _audit_to_markdown(audit: dict) -> str:

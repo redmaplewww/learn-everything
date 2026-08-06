@@ -11,7 +11,10 @@ from learning_ext.db.models import KnowledgeEdge, KnowledgeNode, LearningProject
 from learning_ext.path_generator import (
     export_roadmap_bundle,
     generate_roadmap,
+    import_builtin_roadmap,
     import_roadmap_bundle,
+    list_builtin_roadmaps,
+    load_builtin_roadmap_bundle,
     load_roadmap,
     refine_roadmap,
     save_roadmap,
@@ -246,6 +249,47 @@ class TestRoadmapImportExport:
                     }
                 ),
             )
+
+
+class TestBuiltinRoadmaps:
+    def test_ai_agent_builtin_route_is_valid(self):
+        routes = list_builtin_roadmaps()
+        route = next(
+            r
+            for r in routes
+            if r["id"] == "ai_agent_systems_opencode_deepreason"
+        )
+
+        assert route["nodes"] == 26
+        assert route["total_hours"] == 80.0
+
+        bundle = load_builtin_roadmap_bundle(route["id"])
+        assert bundle["kind"] == "learn-everything.roadmap"
+        assert bundle["project"]["title"].startswith("AI Agent 系统实战路线")
+
+        roadmap = bundle["roadmap"]
+        nodes = roadmap["nodes"]
+        codes = {node["code"] for node in nodes}
+        assert len(nodes) == 26
+        assert sum(float(node["est_hours"]) for node in nodes) == 80.0
+        assert all(stage.get("goal") for stage in roadmap["stages"])
+        assert all(
+            prereq in codes
+            for node in nodes
+            for prereq in node.get("prerequisites", [])
+        )
+
+    def test_import_builtin_route_creates_project(self, session):
+        project = import_builtin_roadmap(
+            session,
+            "ai_agent_systems_opencode_deepreason",
+            user_id="default",
+        )
+
+        assert project.title.startswith("AI Agent 系统实战路线")
+        imported = load_roadmap(session, project.id)
+        assert len(imported["nodes"]) == 26
+        assert imported["nodes"][0]["title"] == "AI Agent 与 Chatbot 的区别"
 
 
 class TestRefineRoadmap:

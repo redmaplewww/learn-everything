@@ -32,13 +32,13 @@ if errorlevel 1 (
 )
 
 echo.
-echo [2/3] 安装 FSRS 间隔重复算法库...
+echo [2/3] 安装 FSRS 间隔重复算法库和导出依赖...
 set VIRTUAL_ENV=%cd%\.venv
-uv pip install fsrs pywebview
+uv pip install fsrs pywebview python-docx
 if errorlevel 1 (
     echo [警告] pywebview 安装失败，将降级为浏览器模式
     set VIRTUAL_ENV=%cd%\.venv
-    uv pip install fsrs
+    uv pip install fsrs python-docx
 )
 
 echo.
