@@ -19,7 +19,10 @@ import {
 type CreationState = "idle" | "previewing" | "ready" | "saving" | "preparing" | "error";
 
 function formatError(error: unknown) {
-  return error instanceof ApiError ? error.message : "本地学习服务不可用，请确认 FastAPI 已启动。";
+  if (error instanceof ApiError) {
+    return error.requestId ? `${error.message}（请求编号：${error.requestId}）` : error.message;
+  }
+  return "本地学习服务不可用，请确认 FastAPI 已启动。";
 }
 
 export function RoadmapCreation({ onCreated }: { onCreated: (projectId: number) => void }) {

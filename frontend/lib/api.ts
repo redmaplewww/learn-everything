@@ -136,7 +136,11 @@ export type ResourceDeletionPreview = { resource: IndexedResource; confirmation_
 export type ResourceUploadEvent = { kind: "started" | "progress" | "completed" | "failed"; resource_id: number; node_id: number; collection_id: string; message: string | null; source_id: string | null };
 
 export class ApiError extends Error {
-  constructor(public readonly status: number, message: string) {
+  constructor(
+    public readonly status: number,
+    message: string,
+    public readonly requestId: string | null = null,
+  ) {
     super(message);
     this.name = "ApiError";
   }
@@ -155,7 +159,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   const body = await response.json().catch(() => null) as { detail?: string } | null;
   if (!response.ok) {
-    throw new ApiError(response.status, body?.detail ?? `请求失败 (${response.status})`);
+    throw new ApiError(
+      response.status,
+      body?.detail ?? `请求失败 (${response.status})`,
+      response.headers.get("x-request-id"),
+    );
   }
   return body as T;
 }
