@@ -455,6 +455,36 @@ def test_generate_roadmap_preview_audits_without_persisting(session, monkeypatch
     assert list_projects(session) == []
 
 
+def test_generate_roadmap_preview_logs_request_context(session, monkeypatch, caplog):
+    import learning_ext.application.roadmap as roadmap_application
+    from learning_ext.observability import reset_request_id, set_request_id
+
+    monkeypatch.setattr(
+        roadmap_application,
+        "generate_roadmap",
+        lambda *_args, **_kwargs: {"summary": "初版", "nodes": [{"code": "1.1"}]},
+    )
+    monkeypatch.setattr(
+        roadmap_application,
+        "audit_and_rewrite_roadmap",
+        lambda *_args, **_kwargs: {
+            "summary": "审计后",
+            "nodes": [{"code": "1.1"}],
+            "_audit": {"score": 88},
+        },
+    )
+    caplog.set_level("INFO", logger="uvicorn.error")
+    token = set_request_id("preview-log-123")
+    try:
+        generate_roadmap_preview("测试主题", "", "", 8)
+    finally:
+        reset_request_id(token)
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert any("路线预览开始 request_id=preview-log-123" in message for message in messages)
+    assert any("路线预览完成 request_id=preview-log-123" in message for message in messages)
+
+
 def test_refine_roadmap_preview_validates_input_and_returns_service_result(monkeypatch):
     import learning_ext.application.roadmap as roadmap_application
 

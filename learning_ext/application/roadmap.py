@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from typing import Any
+import logging
 
 from sqlmodel import Session, select
 
@@ -19,6 +20,9 @@ from learning_ext.path_generator.service import (
     save_roadmap,
 )
 from learning_ext.progress.study import generate_env_checklist, save_env_tasks
+from learning_ext.observability import current_request_id
+
+logger = logging.getLogger("uvicorn.error")
 from learning_ext.application.jobs import ContentPreparation, prepare_project_content
 
 
@@ -109,6 +113,12 @@ def generate_roadmap_preview(
     """生成并审计路线，不写入数据库。"""
     normalized_topic = _required_text(topic, "选题")
     normalized_hours = _weekly_hours(weekly_hours)
+    logger.info(
+        "路线预览开始 request_id=%s topic=%s weekly_hours=%s",
+        current_request_id(),
+        normalized_topic[:120],
+        normalized_hours,
+    )
     generated = generate_roadmap(
         normalized_topic,
         background or "",
@@ -125,6 +135,13 @@ def generate_roadmap_preview(
         model_name=model_name,
     )
     audit = dict(audited.pop("_audit", {}))
+    logger.info(
+        "路线预览完成 request_id=%s topic=%s node_count=%s audit_score=%s",
+        current_request_id(),
+        normalized_topic[:120],
+        len(audited.get("nodes", [])),
+        audit.get("score"),
+    )
     return RoadmapPreview(roadmap=audited, audit=audit)
 
 
@@ -137,9 +154,21 @@ def refine_roadmap_preview(
     """按用户意见调整未保存的路线。"""
     if not isinstance(roadmap, dict) or not roadmap.get("nodes"):
         raise ValueError("请先生成有效的学习路线")
-    return refine_roadmap_service(
+    logger.info(
+        "路线调整开始 request_id=%s node_count=%s instruction_length=%s",
+        current_request_id(),
+        len(roadmap.get("nodes", [])),
+        len(instruction.strip()),
+    )
+    result = refine_roadmap_service(
         roadmap, _required_text(instruction, "调整意见"), model_name=model_name
     )
+    logger.info(
+        "路线调整完成 request_id=%s node_count=%s",
+        current_request_id(),
+        len(result.get("nodes", [])) if isinstance(result, dict) else 0,
+    )
+    return result
 
 
 def create_project(
@@ -166,6 +195,12 @@ def create_project(
         goal=goal or "",
         weekly_hours=normalized_hours,
         roadmap=roadmap,
+    )
+    logger.info(
+        "路线项目保存完成 request_id=%s project_id=%s node_count=%s",
+        current_request_id(),
+        project.id,
+        len(roadmap["nodes"]),
     )
     environment_error = None
     environment_status = "ready"
@@ -200,12 +235,26 @@ def replace_project_roadmap(
         raise ValueError("替换路线会清除现有节点、笔记、资料、复习和测验数据，必须明确确认")
     if not isinstance(roadmap, dict) or not roadmap.get("nodes"):
         raise ValueError("替换路线必须包含至少一个节点")
+    logger.info(
+        "路线替换开始 request_id=%s project_id=%s new_node_count=%s",
+        current_request_id(),
+        project_id,
+        len(roadmap["nodes"]),
+    )
     previous_node_count = len(
         session.exec(select(KnowledgeNode).where(KnowledgeNode.project_id == project_id)).all()
     )
     project = replace_project_roadmap_service(session, project_id, roadmap)
     content_preparation = prepare_project_content(
         session, project.id, user_id=user_id, initial_count=0
+    )
+    logger.info(
+        "路线替换完成 request_id=%s project_id=%s previous_node_count=%s new_node_count=%s content_job_id=%s",
+        current_request_id(),
+        project.id,
+        previous_node_count,
+        len(roadmap["nodes"]),
+        content_preparation.job_id,
     )
     return RoadmapReplacement(
         project_id=project.id,
@@ -220,6 +269,11 @@ def audit_project_roadmap(
 ) -> ProjectRoadmapAudit:
     """只读审计项目路线并返回建议，不保存或替换任何路线数据。"""
     project = _get_project(session, project_id, user_id)
+    logger.info(
+        "路线审计开始 request_id=%s project_id=%s",
+        current_request_id(),
+        project_id,
+    )
     audit, proposed = audit_existing_roadmap(
         load_roadmap(session, project_id),
         project.topic,
@@ -227,11 +281,19 @@ def audit_project_roadmap(
         project.goal,
         project.weekly_hours,
     )
-    return ProjectRoadmapAudit(
+    result = ProjectRoadmapAudit(
         project_id=project_id,
         audit=audit,
         proposed_roadmap=proposed,
     )
+    logger.info(
+        "路线审计完成 request_id=%s project_id=%s proposed_node_count=%s audit_score=%s",
+        current_request_id(),
+        project_id,
+        len(proposed.get("nodes", [])),
+        audit.get("score"),
+    )
+    return result
 
 
 def _required_text(value: str, label: str) -> str:

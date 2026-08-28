@@ -1,7 +1,9 @@
 """FastAPI 应用入口。"""
 
 from contextlib import asynccontextmanager
+import logging
 from pathlib import Path
+from uuid import uuid4
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,6 +16,9 @@ from learning_ext.application import (
     NodeNotFoundError,
     ProjectNotFoundError,
 )
+from learning_ext.observability import current_request_id, reset_request_id, set_request_id
+
+logger = logging.getLogger("uvicorn.error")
 
 
 @asynccontextmanager
@@ -55,15 +60,45 @@ def create_app(frontend_dir: Path | None = None) -> FastAPI:
         allow_headers=["*"],
     )
 
+    @app.middleware("http")
+    async def request_observability(request: Request, call_next):
+        request_id = request.headers.get("x-request-id", "").strip() or uuid4().hex
+        token = set_request_id(request_id)
+        try:
+            response = await call_next(request)
+            response.headers["x-request-id"] = request_id
+            logger.info(
+                "HTTP 请求完成 request_id=%s method=%s path=%s status=%s",
+                request_id,
+                request.method,
+                request.url.path,
+                response.status_code,
+            )
+            return response
+        except Exception:
+            logger.exception(
+                "HTTP 请求异常 request_id=%s method=%s path=%s",
+                request_id,
+                request.method,
+                request.url.path,
+            )
+            raise
+        finally:
+            reset_request_id(token)
+
     @app.exception_handler(ProjectNotFoundError)
     @app.exception_handler(NodeNotFoundError)
     async def not_found_error(_request: Request, exc: ApplicationError):
-        return JSONResponse(status_code=404, content={"detail": str(exc)})
+        response = JSONResponse(status_code=404, content={"detail": str(exc)})
+        response.headers["x-request-id"] = current_request_id()
+        return response
 
     @app.exception_handler(ApplicationError)
     @app.exception_handler(ValueError)
     async def bad_request_error(_request: Request, exc: Exception):
-        return JSONResponse(status_code=400, content={"detail": str(exc)})
+        response = JSONResponse(status_code=400, content={"detail": str(exc)})
+        response.headers["x-request-id"] = current_request_id()
+        return response
 
     app.include_router(projects.router, prefix="/api/v1")
     app.include_router(nodes.router, prefix="/api/v1")

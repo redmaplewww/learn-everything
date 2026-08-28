@@ -39,6 +39,23 @@ def test_list_projects_returns_application_order(session):
     assert [item["title"] for item in response.json()] == ["新项目", "旧项目"]
 
 
+def test_api_assigns_and_propagates_request_id(session, caplog):
+    client = api_client(session)
+    caplog.set_level("INFO", logger="uvicorn.error")
+
+    generated = client.get("/api/v1/projects")
+    assert generated.status_code == 200
+    assert generated.headers["x-request-id"]
+
+    supplied = client.get(
+        "/api/v1/projects",
+        headers={"x-request-id": "route-check-123"},
+    )
+    assert supplied.status_code == 200
+    assert supplied.headers["x-request-id"] == "route-check-123"
+    assert any("request_id=route-check-123" in record.getMessage() for record in caplog.records)
+
+
 def test_get_project_roadmap_returns_node_ids(sample_project, session):
     response = api_client(session).get(f"/api/v1/projects/{sample_project.id}/roadmap")
 
