@@ -43,6 +43,7 @@ import {
 import { RoadmapCreation } from "../features/roadmap/RoadmapCreation";
 import { RagChatPanel } from "../features/chat/RagChatPanel";
 import { ModelConfigurationPanel } from "../features/configuration/ModelConfigurationPanel";
+import { MarkdownContent } from "../features/markdown/MarkdownContent";
 import { ResourceLibraryPanel } from "../features/resources/ResourceLibraryPanel";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
@@ -416,7 +417,7 @@ function Workspace({
           {detailError && <section ref={detailPanelRef} className="node-detail-panel detail-error"><AlertCircle size={18} />{detailError}</section>}
           {detail && detailState === "ready" && <section ref={detailPanelRef} className="node-detail-panel">
             <div className="preview-heading"><div><p className="eyebrow">LESSON DETAIL</p><h3>{detail.title}</h3></div><span>{detail.code}</span></div>
-            <article className="lesson-content">{detail.description || "当前没有完整课程内容。"}</article>
+            <MarkdownContent content={detail.description || "当前没有完整课程内容。"} />
             <div className="detail-actions"><button type="button" className="secondary-button" onClick={() => void runDetailAction(() => generateNodeContent(detail.id, true))}>生成课程</button><button type="button" className="secondary-button" onClick={() => void runDetailAction(() => generatePracticeLesson(detail.id))}>生成实操</button><button type="button" className="secondary-button" onClick={() => void runDetailAction(() => generateNodeResources(detail.id))}>拉取资料</button></div>
             <textarea className="detail-note" value={noteContent} onChange={(event) => setNoteContent(event.target.value)} placeholder="记录你的理解、疑问和总结" />
             <button type="button" className="command-button" onClick={() => void runDetailAction(() => saveNodeNote(detail.id, noteContent))}>保存笔记</button>
