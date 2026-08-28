@@ -11,6 +11,17 @@
 2. **配置 LLM**：编辑 `kotaemon\.env`，填入任一 API key（DeepSeek 推荐）
 3. **启动**：双击 `run.bat`，或开发模式 `python launcher.py`
 
+### Next.js 开发模式
+迁移中的浏览器前端使用 Next.js + FastAPI。先执行 `setup.bat`，再在仓库根目录运行：
+
+```powershell
+kotaemon\.venv\Scripts\python.exe scripts\start_frontend_dev.py
+```
+
+脚本会启动 FastAPI `http://127.0.0.1:8000` 和 Next.js `http://127.0.0.1:3000`。开发态前端通过本机 CORS 直连 API；构建后的静态页面由 FastAPI 在 `http://127.0.0.1:8000/` 同源提供。日志写入 `logs/frontend-dev-api.log` 与 `logs/frontend-dev-next.log`；按 `Ctrl+C` 会回收两个子进程。端口已被占用时脚本会拒绝启动并提示对应端口。
+
+当前 `run.bat` 和 exe 仍打开 Gradio，作为迁移期间的回退入口；桌面启动链将在后续阶段切换为同一套 Next.js 页面。
+
 ### 打包成 exe 分发
 1. `build_exe.bat` — PyInstaller 打包 launcher 为 `LearnEverything.exe`
 2. `pack_portable.bat` — 组装完整便携版（含运行时，解压即用）
@@ -19,7 +30,7 @@
 
 | 文件 | 作用 |
 |---|---|
-| `launcher.py` | 桌面启动器：启动 Gradio 后端 + PyWebView 桌面窗口 |
+| `launcher.py` | 桌面启动器：启动 FastAPI 静态前端 + PyWebView 桌面窗口，保留 Gradio 回退 |
 | `custom_app.py` | 后端入口：加载 LearningApp（Kotaemon + 学习 Tab） |
 | `setup.bat` | 首次环境初始化（装 uv + venv + 依赖） |
 | `run.bat` | 启动程序 |

@@ -6,9 +6,16 @@ kotaemon/ktem_app_data/
 **/.venv/
 kotaemon/.venv/
 **/node_modules/
+frontend/.next/
+frontend/out/
+frontend/tsconfig.tsbuildinfo
+frontend/AGENTS.md
+frontend/CLAUDE.md
 .env
 kotaemon/.env
 .tmp/
+.theflow/
+docs/diagrams/.$*.bkp
 .uv-cache/
 *.log
 .runtime_*.log

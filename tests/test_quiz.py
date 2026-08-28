@@ -26,6 +26,42 @@ class TestGenerateQuiz:
             select(QuizQuestion).where(QuizQuestion.quiz_id == quiz.id)
         ).all()
         assert len(questions) >= 1
+        assert all(question.node_id == node.id for question in questions)
+
+    def test_multi_node_questions_keep_explicit_or_compatible_node_ownership(
+        self, session, sample_project, monkeypatch
+    ):
+        import learning_ext.quiz.service as quiz_service
+
+        nodes = session.exec(
+            select(KnowledgeNode)
+            .where(KnowledgeNode.project_id == sample_project.id)
+            .order_by(KnowledgeNode.id)
+        ).all()[:2]
+        monkeypatch.setattr(
+            quiz_service,
+            "chat_json",
+            lambda *_args, **_kwargs: [
+                {"stem": "第二节点题", "answer": "A", "node_id": nodes[1].id},
+                {"stem": "兼容题", "answer": "B"},
+                {"stem": "无效 ID", "answer": "C", "node_id": 99999},
+            ],
+        )
+
+        quiz = generate_quiz(
+            session,
+            "default",
+            [node.id for node in nodes],
+            project_id=sample_project.id,
+            count=3,
+        )
+        questions = session.exec(
+            select(QuizQuestion)
+            .where(QuizQuestion.quiz_id == quiz.id)
+            .order_by(QuizQuestion.id)
+        ).all()
+
+        assert [question.node_id for question in questions] == [nodes[1].id, nodes[1].id, nodes[0].id]
 
     def test_empty_node_ids_raises(self, session):
         with pytest.raises(ValueError, match="未找到"):
@@ -53,6 +89,8 @@ class TestGradeAnswer:
         assert attempt.user_answer == "我的答案"
         assert attempt.is_correct is True  # mock 返回 correct
         assert attempt.feedback
+        session.expire_all()
+        assert session.get(KnowledgeNode, node.id).mastery >= 0.4
 
     def test_grade_nonexistent_question(self, session):
         with pytest.raises(ValueError, match="not found|不存在"):

@@ -3,7 +3,7 @@
 职责：
     1. 定位 Kotaemon venv 和项目根目录
     2. 设置环境变量 (Python 路径、cohere 占位等)
-    3. 启动 LearningApp 的 Gradio 服务 (后台线程，非阻塞)
+    3. 启动 FastAPI 静态前端服务；必要时保留 Gradio 回退服务
     4. 主线程用 PyWebView 打开桌面窗口 (可选，环境无 pywebview 则退化为浏览器)
 
 使用：
@@ -21,14 +21,8 @@ import threading
 import time
 import webbrowser
 from pathlib import Path
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-    handlers=[logging.StreamHandler(sys.stdout)],
-)
-log = logging.getLogger("learning-launcher")
-
+from urllib.error import URLError
+from urllib.request import urlopen
 
 class _SafeStream:
     """包装 stdout，遇 GBK 无法编码的字符降级为 ASCII，避免 Windows 控制台崩溃"""
@@ -37,20 +31,41 @@ class _SafeStream:
         self._stream = stream
 
     def write(self, text):
+        if self._stream is None:
+            return 0
         try:
-            self._stream.write(text)
+            return self._stream.write(text)
         except UnicodeEncodeError:
-            self._stream.write(text.encode("ascii", "replace").decode("ascii"))
+            return self._stream.write(text.encode("ascii", "replace").decode("ascii"))
 
     def flush(self):
-        self._stream.flush()
+        if self._stream is not None:
+            self._stream.flush()
 
     def __getattr__(self, name):
         return getattr(self._stream, name)
 
 
-sys.stdout = _SafeStream(sys.stdout)
-sys.stderr = _SafeStream(sys.stderr)
+if sys.stdout is not None:
+    sys.stdout = _SafeStream(sys.stdout)
+if sys.stderr is not None:
+    sys.stderr = _SafeStream(sys.stderr)
+
+
+def _create_log_handler() -> logging.Handler:
+    """窗口模式没有控制台时，避免日志处理器绑定空输出流。"""
+    stream = sys.stdout if sys.stdout is not None else sys.stderr
+    if stream is None:
+        return logging.NullHandler()
+    return logging.StreamHandler(stream)
+
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+    handlers=[_create_log_handler()],
+)
+log = logging.getLogger("learning-launcher")
 
 # ------------------------------------------------------------------
 # 路径定位 (支持源码运行和 PyInstaller 打包后运行)
@@ -67,12 +82,19 @@ KOTAEMON_DIR = BASE_DIR / "kotaemon"
 VENV_PYTHON = KOTAEMON_DIR / ".venv" / "Scripts" / "python.exe"
 CUSTOM_APP = BASE_DIR / "custom_app.py"
 
-PORT = 7860
+API_PORT = 8000
+GRADIO_PORT = 7860
 HOST = "127.0.0.1"
 
 
 def is_venv_ready() -> bool:
     return VENV_PYTHON.exists()
+
+
+def pause_before_exit() -> None:
+    """仅在交互式控制台中暂停，避免窗口模式访问空标准输入。"""
+    if sys.stdin is not None and sys.stdin.isatty():
+        input("按回车键退出...")
 
 
 def ensure_venv() -> None:
@@ -84,12 +106,12 @@ def ensure_venv() -> None:
     log.error(f"未找到: {VENV_PYTHON}")
     log.error("请先运行 setup.bat 初始化环境 (首次使用需要联网安装依赖)")
     log.error("=" * 60)
-    input("按回车键退出...")
+    pause_before_exit()
     sys.exit(1)
 
 
-def find_free_port(default: int = 7860) -> int:
-    """7860 被占用则找空闲端口"""
+def find_free_port(default: int = 7860) -> int | None:
+    """默认端口被占用时，返回后续可用端口。"""
     for port in range(default, default + 20):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             try:
@@ -97,17 +119,24 @@ def find_free_port(default: int = 7860) -> int:
                 return port
             except OSError:
                 continue
-    return default
+    return None
 
 
-def wait_for_server(port: int, timeout: int = 120) -> bool:
-    """等待 Gradio 服务就绪"""
+def frontend_assets_ready() -> bool:
+    return (BASE_DIR / "frontend" / "out" / "index.html").is_file()
+
+
+def wait_for_server(port: int, timeout: int = 120, process: subprocess.Popen | None = None) -> bool:
+    """等待 HTTP 首页可用，并在子进程提前退出时立即返回。"""
     start = time.time()
     while time.time() - start < timeout:
+        if process is not None and process.poll() is not None:
+            return False
         try:
-            with socket.create_connection((HOST, port), timeout=2):
-                return True
-        except OSError:
+            with urlopen(f"http://{HOST}:{port}/", timeout=2) as response:
+                if response.status == 200:
+                    return True
+        except (OSError, URLError):
             time.sleep(1)
     return False
 
@@ -122,6 +151,8 @@ def start_gradio_backend(port: int) -> subprocess.Popen:
     # 占位 key 避免 Kotaemon 初始化 cohere 等服务校验
     for k in ("COHERE_API_KEY", "VOYAGE_API_KEY", "MISTRAL_API_KEY", "GOOGLE_API_KEY"):
         env.setdefault(k, "placeholder-key-1234567890")
+    # LearningApp 未实现 Kotaemon 的登录页，必须关闭默认用户管理功能。
+    env["KH_FEATURE_USER_MANAGEMENT"] = "0"
     env["GRADIO_SERVER_NAME"] = HOST
     env["GRADIO_SERVER_PORT"] = str(port)
     env["PYTHONPATH"] = str(BASE_DIR) + os.pathsep + env.get("PYTHONPATH", "")
@@ -147,6 +178,52 @@ def start_gradio_backend(port: int) -> subprocess.Popen:
                 line = line.rstrip()
                 if line:
                     log.info(f"[backend] {line}")
+        except Exception:
+            pass
+
+    threading.Thread(target=_log_pipe, daemon=True).start()
+    return proc
+
+
+def start_api_backend(port: int) -> subprocess.Popen:
+    """以子进程启动 FastAPI，并由它托管已导出的 Next.js 静态资源。"""
+    env = os.environ.copy()
+    for key in ("COHERE_API_KEY", "VOYAGE_API_KEY", "MISTRAL_API_KEY", "GOOGLE_API_KEY"):
+        env.setdefault(key, "placeholder-key-1234567890")
+    env["PYTHONPATH"] = os.pathsep.join(
+        [str(BASE_DIR), str(KOTAEMON_DIR), env.get("PYTHONPATH", "")]
+    )
+    env["PYTHONUNBUFFERED"] = "1"
+
+    command = [
+        str(VENV_PYTHON),
+        "-m",
+        "uvicorn",
+        "api.main:app",
+        "--host",
+        HOST,
+        "--port",
+        str(port),
+    ]
+    log.info("启动 FastAPI 静态前端服务: %s", " ".join(command))
+    proc = subprocess.Popen(
+        command,
+        cwd=str(BASE_DIR),
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        bufsize=1,
+    )
+
+    def _log_pipe():
+        try:
+            for line in proc.stdout:
+                line = line.rstrip()
+                if line:
+                    log.info("[api] %s", line)
         except Exception:
             pass
 
@@ -189,21 +266,31 @@ def main():
 
     ensure_venv()
 
-    port = find_free_port(PORT)
-    if port != PORT:
-        log.warning(f"端口 {PORT} 被占用，改用 {port}")
+    use_gradio = os.environ.get("LE_UI", "next").lower() == "gradio"
+    if not use_gradio and not frontend_assets_ready():
+        log.error("未找到 frontend/out/index.html，无法启动新前端。请先在 frontend 目录执行 npm run build。")
+        pause_before_exit()
+        sys.exit(1)
+    default_port = GRADIO_PORT if use_gradio else API_PORT
+    port = find_free_port(default_port)
+    if port is None:
+        log.error(f"端口 {default_port}-{default_port + 19} 均被占用，未启动服务。")
+        pause_before_exit()
+        sys.exit(1)
+    if port != default_port:
+        log.warning(f"端口 {default_port} 被占用，改用 {port}")
 
-    # 启动 Gradio 后端
-    proc = start_gradio_backend(port)
-    log.info(f"等待后端就绪 (最多 180s)...")
-    if not wait_for_server(port, timeout=180):
-        log.error("后端启动超时，请查看上方日志")
+    proc = start_gradio_backend(port) if use_gradio else start_api_backend(port)
+    mode_name = "Gradio 回退服务" if use_gradio else "FastAPI 静态前端服务"
+    log.info(f"等待{mode_name}就绪 (最多 180s)...")
+    if not wait_for_server(port, timeout=180, process=proc):
+        log.error(f"{mode_name}未能就绪或已提前退出，请查看上方日志")
         proc.terminate()
-        input("按回车键退出...")
+        pause_before_exit()
         sys.exit(1)
 
     url = f"http://{HOST}:{port}"
-    log.info(f"[OK] 后端就绪: {url}")
+    log.info(f"[OK] {mode_name}就绪: {url}")
 
     # 默认浏览器模式 (最稳定), 设 LE_DESKTOP=1 环境变量启用 PyWebView 桌面窗口
     use_pywebview = os.environ.get("LE_DESKTOP") == "1"
@@ -219,7 +306,7 @@ def main():
         log.info("桌面窗口已关闭，正在停止后端...")
     else:
         webbrowser.open(url)
-        log.info("已在浏览器打开 (http://127.0.0.1:7860)。关闭本窗口或 Ctrl+C 退出。")
+        log.info(f"已在浏览器打开 ({url})。关闭本窗口或 Ctrl+C 退出。")
         try:
             proc.wait()
         except KeyboardInterrupt:
@@ -238,5 +325,5 @@ if __name__ == "__main__":
         main()
     except Exception as e:
         log.exception(f"启动失败: {e}")
-        input("按回车键退出...")
+        pause_before_exit()
         sys.exit(1)

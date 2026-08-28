@@ -1,0 +1,492 @@
+"use client";
+
+import {
+  AlertCircle,
+  ArrowRight,
+  BookOpenCheck,
+  CheckCircle2,
+  CircleDot,
+  Plus,
+  LoaderCircle,
+  RefreshCw,
+  RotateCcw,
+} from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+import {
+  ApiError,
+  apiUrl,
+  getProjectRoadmap,
+  getProjectWorkspace,
+  generateNodeContent,
+  generateNodeResources,
+  generatePracticeLesson,
+  getNodeDetail,
+  getDueCards,
+  generateQuiz,
+  getDashboard,
+  listProjects,
+  saveNodeNote,
+  submitReview,
+  submitQuizAnswer,
+  updateNodeStatus,
+  type ProjectRoadmap,
+  type ProjectSummary,
+  type ProjectWorkspace,
+  type NodeDetail,
+  type WorkspaceNode,
+  type ReviewCard,
+  type QuizAnswer,
+  type QuizGeneration,
+  type Dashboard,
+} from "../lib/api";
+import { RoadmapCreation } from "../features/roadmap/RoadmapCreation";
+import { RagChatPanel } from "../features/chat/RagChatPanel";
+import { ModelConfigurationPanel } from "../features/configuration/ModelConfigurationPanel";
+import { ResourceLibraryPanel } from "../features/resources/ResourceLibraryPanel";
+
+type LoadState = "idle" | "loading" | "ready" | "error";
+
+const statusLabels: Record<string, string> = {
+  pending: "待开始",
+  learning: "学习中",
+  mastered: "已掌握",
+  weak: "需复习",
+  skipped: "已跳过",
+};
+
+function formatError(error: unknown) {
+  if (error instanceof ApiError) {
+    return error.message;
+  }
+  return "无法连接本地学习服务，请确认 FastAPI 已启动。";
+}
+
+function nodePreview(description: string) {
+  const plainText = description.replace(/^#{1,6}\s+/gm, "").replace(/\s+/g, " ").trim();
+  return plainText.length > 260 ? `${plainText.slice(0, 260)}...` : plainText || "尚未准备学习内容。";
+}
+
+function ProjectList({
+  projects,
+  selectedId,
+  state,
+  error,
+  onSelect,
+  onRetry,
+  onCreate,
+}: {
+  projects: ProjectSummary[];
+  selectedId: number | null;
+  state: LoadState;
+  error: string | null;
+  onSelect: (projectId: number) => void;
+  onRetry: () => void;
+  onCreate: () => void;
+}) {
+  return (
+    <aside className="project-rail" aria-label="项目列表">
+      <div className="rail-title-row">
+        <div>
+          <p className="eyebrow">LOCAL STUDY</p>
+          <h1>学习轨迹</h1>
+        </div>
+        <button className="icon-button" type="button" onClick={onRetry} title="刷新项目">
+          <RefreshCw size={18} aria-hidden="true" />
+          <span className="sr-only">刷新项目</span>
+        </button>
+      </div>
+
+      {state === "loading" && <div className="rail-message"><LoaderCircle className="spin" size={18} /> 正在读取项目</div>}
+      {state === "error" && (
+        <div className="rail-message error-message">
+          <AlertCircle size={18} />
+          <span>{error}</span>
+          <button type="button" className="text-action" onClick={onRetry}>重试</button>
+        </div>
+      )}
+      {state === "ready" && projects.length === 0 && (
+        <div className="rail-message">还没有学习项目。请先通过现有路线页创建一个项目。</div>
+      )}
+      <nav className="project-list">
+        {projects.map((project) => {
+          const isSelected = project.id === selectedId;
+          return (
+            <button
+              key={project.id}
+              type="button"
+              className={`project-item ${isSelected ? "selected" : ""}`}
+              onClick={() => onSelect(project.id)}
+              aria-current={isSelected ? "page" : undefined}
+            >
+              <span className="project-title">{project.title}</span>
+              <span className="project-topic">{project.topic}</span>
+              <span className="project-metric">{project.progress.done}/{project.progress.total} 已完成</span>
+            </button>
+          );
+        })}
+      </nav>
+      <button className="new-project-button" type="button" onClick={onCreate}><Plus size={17} />新建学习路线</button>
+    </aside>
+  );
+}
+
+function StatusButton({
+  node,
+  pending,
+  onUpdate,
+}: {
+  node: WorkspaceNode;
+  pending: boolean;
+  onUpdate: (status: string) => void;
+}) {
+  const options = ["pending", "learning", "mastered", "weak"];
+  return (
+    <div className="status-control" aria-label={`${node.title} 的学习状态`}>
+      {options.map((status) => (
+        <button
+          key={status}
+          type="button"
+          className={`status-button ${node.status === status ? "active" : ""}`}
+          disabled={pending}
+          onClick={() => onUpdate(status)}
+        >
+          {statusLabels[status]}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function ReviewPanel({ projectId }: { projectId: number }) {
+  const [card, setCard] = useState<ReviewCard | null>(null);
+  const [state, setState] = useState<LoadState>("loading");
+  const [error, setError] = useState<string | null>(null);
+  const [showBack, setShowBack] = useState(false);
+  const load = useCallback(async () => {
+    setState("loading"); setError(null);
+    try { const queue = await getDueCards(projectId); setCard(queue.cards[0] ?? null); setShowBack(false); setState("ready"); }
+    catch (loadError) { setError(formatError(loadError)); setState("error"); }
+  }, [projectId]);
+  useEffect(() => { void load(); }, [load]);
+  const review = async (rating: number) => {
+    if (!card) return;
+    setState("loading");
+    try { const result = await submitReview(card.id, rating, projectId); setCard(result.next_card); setShowBack(false); setState("ready"); }
+    catch (reviewError) { setError(formatError(reviewError)); setState("error"); }
+  };
+  return <section className="review-panel">
+    <div className="section-heading"><div><p className="eyebrow">FSRS REVIEW</p><h3>到期复习</h3></div><button type="button" className="text-action" onClick={() => void load()}>刷新</button></div>
+    {state === "loading" && <div className="review-state"><LoaderCircle className="spin" size={18} />正在读取复习卡片</div>}
+    {state === "error" && <div className="review-state detail-error"><AlertCircle size={18} />{error}<button type="button" className="text-action" onClick={() => void load()}>重试</button></div>}
+    {state === "ready" && !card && <div className="review-state">当前没有到期卡片。</div>}
+    {state === "ready" && card && <div className="review-card"><strong>{card.front}</strong>{showBack && <p>{card.back}</p>}<button type="button" className="secondary-button" onClick={() => setShowBack((value) => !value)}>{showBack ? "隐藏答案" : "查看答案"}</button><div className="review-actions"><button type="button" onClick={() => void review(1)}>重来</button><button type="button" onClick={() => void review(2)}>困难</button><button type="button" onClick={() => void review(3)}>良好</button><button type="button" onClick={() => void review(4)}>简单</button></div></div>}
+  </section>;
+}
+
+function QuizPanel({ projectId, nodes }: { projectId: number; nodes: WorkspaceNode[] }) {
+  const [selectedNodeIds, setSelectedNodeIds] = useState<number[]>([]);
+  const [count, setCount] = useState(3);
+  const [qtype, setQtype] = useState("mixed");
+  const [quiz, setQuiz] = useState<QuizGeneration | null>(null);
+  const [index, setIndex] = useState(0);
+  const [answer, setAnswer] = useState("");
+  const [feedback, setFeedback] = useState<QuizAnswer | null>(null);
+  const [state, setState] = useState<LoadState>("idle");
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => { setSelectedNodeIds(nodes.map((node) => node.id)); setQuiz(null); setIndex(0); setFeedback(null); }, [projectId, nodes]);
+  const question = quiz?.questions[index] ?? null;
+  const generate = async () => {
+    if (!selectedNodeIds.length) { setError("请至少选择一个知识点"); return; }
+    setState("loading"); setError(null);
+    try { const next = await generateQuiz(projectId, { node_ids: selectedNodeIds, count, qtype }); setQuiz(next); setIndex(0); setAnswer(""); setFeedback(null); setState("ready"); }
+    catch (generationError) { setError(formatError(generationError)); setState("error"); }
+  };
+  const submit = async () => {
+    if (!question || !answer.trim()) { setError("请输入答案后再提交"); return; }
+    setState("loading"); setError(null);
+    try { setFeedback(await submitQuizAnswer(projectId, question.id, answer)); setState("ready"); }
+    catch (submissionError) { setError(formatError(submissionError)); setState("error"); }
+  };
+  const next = () => { setIndex((value) => value + 1); setAnswer(""); setFeedback(null); setError(null); };
+  return <section className="quiz-panel">
+    <div className="section-heading"><div><p className="eyebrow">KNOWLEDGE CHECK</p><h3>查漏测验</h3></div></div>
+    <div className="quiz-form"><label>知识点<select multiple value={selectedNodeIds.map(String)} onChange={(event) => setSelectedNodeIds([...event.currentTarget.selectedOptions].map((item) => Number(item.value)))}>{nodes.map((node) => <option value={node.id} key={node.id}>{node.code} {node.title}</option>)}</select></label><label>题目数量<input type="number" min="1" max="20" value={count} onChange={(event) => setCount(Number(event.target.value))} /></label><label>题型<select value={qtype} onChange={(event) => setQtype(event.target.value)}><option value="mixed">混合</option><option value="choice">选择</option><option value="fill">填空</option><option value="short">简答</option><option value="practice">实操</option></select></label><button type="button" className="command-button" onClick={() => void generate()} disabled={state === "loading"}>生成测验</button></div>
+    {state === "loading" && <div className="review-state"><LoaderCircle className="spin" size={18} />正在处理测验</div>}
+    {error && <div className="review-state detail-error"><AlertCircle size={18} />{error}</div>}
+    {question && state !== "loading" && <div className="quiz-question"><span>第 {index + 1} / {quiz?.questions.length} 题 · {question.qtype}</span><strong>{question.stem}</strong>{question.options.map((option) => <button type="button" className={`quiz-option ${answer === option ? "active" : ""}`} key={option} onClick={() => setAnswer(option)}>{option}</button>)}<textarea value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="输入你的答案" /><button type="button" className="command-button" onClick={() => void submit()} disabled={Boolean(feedback)}>提交答案</button>{feedback && <div className={feedback.is_correct ? "quiz-feedback correct" : "quiz-feedback incorrect"}><strong>{feedback.is_correct ? "回答正确" : "需要巩固"}</strong><p>{feedback.feedback}</p>{feedback.mastery !== null && <span>当前掌握度 {Math.round(feedback.mastery * 100)}%</span>}{index + 1 < (quiz?.questions.length ?? 0) && <button type="button" className="secondary-button" onClick={next}>下一题</button>}</div>}</div>}
+  </section>;
+}
+
+function DashboardPanel({ projectId }: { projectId: number }) {
+  const [dashboard, setDashboard] = useState<Dashboard | null>(null);
+  const [state, setState] = useState<LoadState>("loading");
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(async () => { setState("loading"); setError(null); try { setDashboard(await getDashboard(projectId)); setState("ready"); } catch (loadError) { setError(formatError(loadError)); setState("error"); } }, [projectId]);
+  useEffect(() => { void load(); }, [load]);
+  const download = (kind: string) => { window.location.assign(apiUrl(`/projects/${projectId}/exports/${kind}`)); };
+  return <section className="dashboard-panel"><div className="section-heading"><div><p className="eyebrow">LEARNING DASHBOARD</p><h3>学习概览</h3></div><button type="button" className="text-action" onClick={() => void load()}>刷新</button></div>
+    {state === "loading" && <div className="review-state"><LoaderCircle className="spin" size={18} />正在读取看板</div>}{state === "error" && <div className="review-state detail-error"><AlertCircle size={18} />{error}<button type="button" className="text-action" onClick={() => void load()}>重试</button></div>}
+    {dashboard && state === "ready" && <><div className="dashboard-metrics"><div><strong>{dashboard.metrics.total_nodes}</strong><span>知识点</span></div><div><strong>{dashboard.metrics.mastered_nodes}</strong><span>已掌握</span></div><div><strong>{Math.round(dashboard.metrics.avg_mastery * 100)}%</strong><span>平均掌握</span></div><div><strong>{dashboard.metrics.week_minutes}</strong><span>近 7 天分钟</span></div><div><strong>{dashboard.metrics.due_cards}/{dashboard.metrics.total_cards}</strong><span>到期卡片</span></div></div><div className="dashboard-detail"><div><strong>状态分布</strong>{Object.entries(dashboard.status_counts).map(([key, value]) => <p key={key}>{statusLabels[key] ?? key} <b>{value}</b></p>)}</div><div><strong>近 14 天学习热力</strong><div className="heatmap">{dashboard.heatmap.map((day) => <span title={`${day.date}: ${day.minutes} 分钟`} style={{ opacity: day.minutes ? Math.min(1, 0.25 + day.minutes / 60) : 0.1 }} key={day.date}>{day.minutes}</span>)}</div></div></div><article className="dashboard-report">{dashboard.latest_report}</article><div className="export-actions"><button type="button" onClick={() => download("roadmap")}>路线 JSON</button><button type="button" onClick={() => download("markdown")}>学习笔记</button><button type="button" onClick={() => download("report")}>进度报告</button><button type="button" onClick={() => download("anki")}>Anki ZIP</button></div></>}
+  </section>;
+}
+
+function Workspace({
+  workspace,
+  roadmap,
+  state,
+  error,
+  statusPendingId,
+  onRetry,
+  onUpdateStatus,
+}: {
+  workspace: ProjectWorkspace | null;
+  roadmap: ProjectRoadmap | null;
+  state: LoadState;
+  error: string | null;
+  statusPendingId: number | null;
+  onRetry: () => void;
+  onUpdateStatus: (node: WorkspaceNode, status: string) => void;
+}) {
+  const roadmapNodes = useMemo(() => new Map(roadmap?.nodes.map((node) => [node.id, node]) ?? []), [roadmap]);
+  const [detail, setDetail] = useState<NodeDetail | null>(null);
+  const [detailState, setDetailState] = useState<LoadState>("idle");
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [noteContent, setNoteContent] = useState("");
+  const detailPanelRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (detailState !== "idle") {
+      detailPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  }, [detailState]);
+
+  const openDetail = async (nodeId: number) => {
+    setDetailState("loading");
+    setDetailError(null);
+    try {
+      const next = await getNodeDetail(nodeId);
+      setDetail(next);
+      setNoteContent(next.note?.content ?? "");
+      setDetailState("ready");
+    } catch (loadError) {
+      setDetailError(formatError(loadError));
+      setDetailState("error");
+    }
+  };
+  const runDetailAction = async (action: () => Promise<{ detail: NodeDetail }>) => {
+    setDetailState("loading");
+    setDetailError(null);
+    try {
+      const result = await action();
+      setDetail(result.detail);
+      setNoteContent(result.detail.note?.content ?? noteContent);
+      setDetailState("ready");
+    } catch (actionError) {
+      setDetailError(formatError(actionError));
+      setDetailState("error");
+    }
+  };
+
+  if (state === "loading") {
+    return <main className="workspace-state"><LoaderCircle className="spin" size={28} /> 正在加载学习工作台</main>;
+  }
+  if (state === "error") {
+    return (
+      <main className="workspace-state">
+        <AlertCircle size={30} />
+        <strong>项目数据暂时不可用</strong>
+        <span>{error}</span>
+        <button type="button" className="command-button" onClick={onRetry}><RotateCcw size={16} />重新加载</button>
+      </main>
+    );
+  }
+  if (!workspace) {
+    return (
+      <main className="workspace-state">
+        <BookOpenCheck size={34} />
+        <strong>选择一个项目</strong>
+        <span>这里会显示路线、学习内容和当前进度。</span>
+      </main>
+    );
+  }
+
+  const { project, progress, environment, nodes } = workspace;
+  const progressWidth = progress.total === 0 ? 0 : Math.round((progress.done / progress.total) * 100);
+  return (
+    <main className="workspace">
+      <header className="workspace-header">
+        <div>
+          <p className="eyebrow">{project.topic || "LEARNING PROJECT"}</p>
+          <h2>{project.title}</h2>
+          <p className="project-goal">{project.goal || project.background || "尚未填写学习目标。"}</p>
+        </div>
+        <div className="progress-readout" aria-label={`项目进度 ${progress.done}/${progress.total}`}>
+          <span>{progress.done}<small> / {progress.total}</small></span>
+          <p>完成节点</p>
+        </div>
+      </header>
+
+      <section className="progress-strip" aria-label="学习进度">
+        <div className="progress-line"><span style={{ width: `${progressWidth}%` }} /></div>
+        <div className="progress-labels">
+          <span>{progressWidth}% 已完成</span>
+          <span>{progress.learning} 个学习中</span>
+          <span>{progress.weak} 个待巩固</span>
+        </div>
+      </section>
+
+      {environment.description && (
+        <section className="environment-note">
+          <CircleDot size={18} />
+          <div><strong>环境准备</strong><span>{environment.description}</span></div>
+          <em>{environment.status}</em>
+        </section>
+      )}
+
+      <section className="section-heading">
+        <div><p className="eyebrow">ROADMAP</p><h3>学习节点</h3></div>
+        <span>{roadmap?.stages.length ?? 0} 个阶段</span>
+      </section>
+
+      <div className="node-list">
+        {nodes.length === 0 && <div className="empty-nodes">该项目尚无节点。可返回 Gradio 路线页继续完善。</div>}
+        {nodes.map((node) => {
+          const roadmapNode = roadmapNodes.get(node.id);
+          return (
+            <article className={`node-row node-${node.status}`} key={node.id}>
+              <div className="node-marker" aria-hidden="true">{node.status === "mastered" ? <CheckCircle2 size={20} /> : node.code}</div>
+              <div className="node-content">
+                <div className="node-title-row"><h4>{node.title}</h4><span>{roadmapNode?.stage || node.stage}</span></div>
+                <p>{nodePreview(node.description)}</p>
+                <div className="node-meta">
+                  <span>{node.est_hours} 小时</span><span>难度 {node.difficulty}/5</span><span>{statusLabels[node.status] ?? node.status}</span>
+                </div>
+                {node.resources.length > 0 && <p className="resource-count">已关联 {node.resources.length} 项学习资料</p>}
+                <button type="button" className="text-action node-detail-button" onClick={() => void openDetail(node.id)}>查看详情</button>
+              </div>
+              <StatusButton node={node} pending={statusPendingId === node.id} onUpdate={(status) => onUpdateStatus(node, status)} />
+            </article>
+          );
+        })}
+      </div>
+      {detailState === "loading" && <section ref={detailPanelRef} className="node-detail-panel"><LoaderCircle className="spin" size={18} />正在读取节点详情</section>}
+      {detailError && <section ref={detailPanelRef} className="node-detail-panel detail-error"><AlertCircle size={18} />{detailError}</section>}
+      {detail && detailState === "ready" && <section ref={detailPanelRef} className="node-detail-panel">
+        <div className="preview-heading"><div><p className="eyebrow">LESSON DETAIL</p><h3>{detail.title}</h3></div><span>{detail.code}</span></div>
+        <article className="lesson-content">{detail.description || "当前没有完整课程内容。"}</article>
+        <div className="detail-actions"><button type="button" className="secondary-button" onClick={() => void runDetailAction(() => generateNodeContent(detail.id, true))}>生成课程</button><button type="button" className="secondary-button" onClick={() => void runDetailAction(() => generatePracticeLesson(detail.id))}>生成实操</button><button type="button" className="secondary-button" onClick={() => void runDetailAction(() => generateNodeResources(detail.id))}>拉取资料</button></div>
+        <textarea className="detail-note" value={noteContent} onChange={(event) => setNoteContent(event.target.value)} placeholder="记录你的理解、疑问和总结" />
+        <button type="button" className="command-button" onClick={() => void runDetailAction(() => saveNodeNote(detail.id, noteContent))}>保存笔记</button>
+        {detail.practice && <article className="detail-subsection"><strong>{detail.practice.title}</strong><pre>{detail.practice.description}</pre></article>}
+        {detail.resources.map((resource) => <a className="detail-resource" href={resource.url} target="_blank" rel="noreferrer" key={resource.id ?? resource.url}>{resource.title}</a>)}
+      </section>}
+      <ReviewPanel projectId={project.id} />
+      <QuizPanel projectId={project.id} nodes={nodes} />
+      <ResourceLibraryPanel nodes={nodes} />
+      <RagChatPanel nodes={nodes} />
+      <ModelConfigurationPanel />
+      <DashboardPanel projectId={project.id} />
+    </main>
+  );
+}
+
+export default function HomePage() {
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [projectState, setProjectState] = useState<LoadState>("loading");
+  const [workspaceState, setWorkspaceState] = useState<LoadState>("idle");
+  const [workspace, setWorkspace] = useState<ProjectWorkspace | null>(null);
+  const [roadmap, setRoadmap] = useState<ProjectRoadmap | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [statusPendingId, setStatusPendingId] = useState<number | null>(null);
+  const [view, setView] = useState<"workspace" | "create">("workspace");
+
+  const loadWorkspace = useCallback(async (projectId: number) => {
+    setWorkspaceState("loading");
+    setError(null);
+    try {
+      const [nextRoadmap, nextWorkspace] = await Promise.all([
+        getProjectRoadmap(projectId),
+        getProjectWorkspace(projectId),
+      ]);
+      setRoadmap(nextRoadmap);
+      setWorkspace(nextWorkspace);
+      setWorkspaceState("ready");
+    } catch (loadError) {
+      setWorkspaceState("error");
+      setError(formatError(loadError));
+    }
+  }, []);
+
+  const loadProjects = useCallback(async () => {
+    setProjectState("loading");
+    setError(null);
+    try {
+      const nextProjects = await listProjects();
+      setProjects(nextProjects);
+      setProjectState("ready");
+      const nextId = selectedId && nextProjects.some((project) => project.id === selectedId)
+        ? selectedId
+        : nextProjects[0]?.id ?? null;
+      setSelectedId(nextId);
+      if (nextId) {
+        await loadWorkspace(nextId);
+      } else {
+        setWorkspace(null);
+        setRoadmap(null);
+        setWorkspaceState("ready");
+      }
+    } catch (loadError) {
+      setProjectState("error");
+      setError(formatError(loadError));
+    }
+  }, [loadWorkspace, selectedId]);
+
+  useEffect(() => { void loadProjects(); }, [loadProjects]);
+
+  const chooseProject = (projectId: number) => {
+    setView("workspace");
+    setSelectedId(projectId);
+    void loadWorkspace(projectId);
+  };
+
+  const showCreatedProject = (projectId: number) => {
+    setView("workspace");
+    setSelectedId(projectId);
+    void loadWorkspace(projectId);
+    void loadProjects();
+  };
+
+  const changeNodeStatus = async (node: WorkspaceNode, status: string) => {
+    if (!workspace || status === node.status) return;
+    const priorWorkspace = workspace;
+    setStatusPendingId(node.id);
+    setError(null);
+    setWorkspace({
+      ...workspace,
+      nodes: workspace.nodes.map((item) => item.id === node.id ? { ...item, status } : item),
+    });
+    try {
+      const result = await updateNodeStatus(node.id, status);
+      setWorkspace(result.workspace);
+      setRoadmap((current) => current ? {
+        ...current,
+        nodes: current.nodes.map((item) => item.id === node.id ? { ...item, status } : item),
+      } : current);
+      void loadProjects();
+    } catch (updateError) {
+      setWorkspace(priorWorkspace);
+      setError(formatError(updateError));
+    } finally {
+      setStatusPendingId(null);
+    }
+  };
+
+  return (
+    <div className="app-shell">
+      <ProjectList projects={projects} selectedId={view === "workspace" ? selectedId : null} state={projectState} error={error} onSelect={chooseProject} onRetry={() => void loadProjects()} onCreate={() => setView("create")} />
+      {view === "create" ? <RoadmapCreation onCreated={showCreatedProject} /> : <Workspace workspace={workspace} roadmap={roadmap} state={workspaceState} error={error} statusPendingId={statusPendingId} onRetry={() => selectedId && void loadWorkspace(selectedId)} onUpdateStatus={changeNodeStatus} />}
+    </div>
+  );
+}

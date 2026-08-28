@@ -200,6 +200,8 @@ def test_workbench_reference_copy_no_longer_promises_study_report():
 
 
 def test_gen_resources_reports_actual_saved_resource_count(monkeypatch):
+    from types import SimpleNamespace
+
     import learning_ext.pages.study_workbench as wb
     from learning_ext.db.models import KnowledgeNode, LearningProject
     from learning_ext.pages.study_workbench import StudyWorkbenchPage
@@ -230,13 +232,13 @@ def test_gen_resources_reports_actual_saved_resource_count(monkeypatch):
     monkeypatch.setattr(wb, "Session", lambda *_args, **_kwargs: FakeSession())
     monkeypatch.setattr(
         wb,
-        "generate_resources",
-        lambda *_args, **_kwargs: [{"title": "A"}, {"title": "B"}],
-    )
-    monkeypatch.setattr(
-        wb,
-        "save_resources_to_db",
-        lambda *_args, **_kwargs: saved_resources,
+        "generate_node_resources",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            status="generated",
+            resource_count=len(saved_resources),
+            error=None,
+            detail=SimpleNamespace(resources=saved_resources),
+        ),
     )
 
     _md, status = page._gen_resources(7, 3)

@@ -15,19 +15,23 @@ from ktem.app import BasePage
 from ktem.db.engine import engine
 from sqlmodel import Session, select
 
-from learning_ext.db.models import KnowledgeNode, LearningProject
+from learning_ext.application import (
+    create_project,
+    generate_roadmap_preview,
+    get_project_roadmap,
+    list_projects,
+    prepare_project_content,
+    refine_roadmap_preview,
+    replace_project_roadmap as replace_project_roadmap_application,
+)
+from learning_ext.db.models import LearningProject
 from learning_ext.path_generator import (
     audit_existing_roadmap,
-    audit_and_rewrite_roadmap,
     export_roadmap_bundle,
-    generate_roadmap,
     import_roadmap_bundle,
     load_roadmap,
-    refine_roadmap,
-    replace_project_roadmap,
-    save_roadmap,
 )
-from learning_ext.progress.study import course_code_sort_key, sort_nodes_by_code
+from learning_ext.progress.study import course_code_sort_key
 
 logger = logging.getLogger(__name__)
 
@@ -153,6 +157,9 @@ class PathGeneratorPage(BasePage):
                     placeholder="例如：3 或 3,5,8",
                     lines=1,
                 )
+                self.audit_confirm = gr.Textbox(
+                    label="确认替换", placeholder="REPLACE", lines=1
+                )
                 self.audit_project_btn = gr.Button(
                     "🧭 审计并重生成该项目", variant="primary"
                 )
@@ -254,7 +261,7 @@ class PathGeneratorPage(BasePage):
         )
         self.audit_project_btn.click(
             fn=self._handle_audit_project,
-            inputs=[self.audit_project_id],
+            inputs=[self.audit_project_id, self.audit_confirm],
             outputs=[
                 self.project_list,
                 self.roadmap_output,
@@ -271,25 +278,14 @@ class PathGeneratorPage(BasePage):
         if not topic or not topic.strip():
             return "", "{}", "⚠️ 请输入选题"
         try:
-            roadmap = generate_roadmap(
-                topic=topic.strip(),
-                background=background or "",
-                goal=goal or "",
-                weekly_hours=float(hours) if hours else 10.0,
+            preview = generate_roadmap_preview(
+                topic.strip(), background or "", goal or "", float(hours) if hours else 10.0
             )
-            audited = audit_and_rewrite_roadmap(
-                roadmap=roadmap,
-                topic=topic.strip(),
-                background=background or "",
-                goal=goal or "",
-                weekly_hours=float(hours) if hours else 10.0,
-            )
-            audit = audited.pop("_audit", {})
-            audited_md = self._roadmap_to_markdown(audited)
-            audit_md = self._audit_to_markdown(audit)
+            audited_md = self._roadmap_to_markdown(preview.roadmap)
+            audit_md = self._audit_to_markdown(preview.audit)
             return (
                 f"{audit_md}\n\n---\n\n{audited_md}",
-                json.dumps(audited, ensure_ascii=False, indent=2),
+                json.dumps(preview.roadmap, ensure_ascii=False, indent=2),
                 "✅ 路线已生成，并已自动审计补全，可保存为项目",
             )
         except Exception as e:
@@ -302,7 +298,7 @@ class PathGeneratorPage(BasePage):
             return "", current_json, "⚠️ 请输入调整意见"
         try:
             current = json.loads(current_json) if current_json else {}
-            refined = refine_roadmap(current, instruction.strip())
+            refined = refine_roadmap_preview(current, instruction.strip())
             md = self._roadmap_to_markdown(refined)
             return (
                 md,
@@ -331,116 +327,45 @@ class PathGeneratorPage(BasePage):
             yield None, "", f"❌ 路线 JSON 解析失败: {e}"
             return
 
-        # ---- 1. 保存项目和知识点 ----
         yield None, "⏳ 正在保存学习路线...", ""
         try:
             with Session(engine) as session:
-                project = save_roadmap(
-                    session=session,
-                    user_id="default",
-                    topic=topic or "未命名选题",
-                    background=background or "",
-                    goal=goal or "",
-                    weekly_hours=float(hours) if hours else 10.0,
-                    roadmap=roadmap,
+                created = create_project(
+                    session,
+                    topic or "未命名选题",
+                    background or "",
+                    goal or "",
+                    float(hours) if hours else 10.0,
+                    roadmap,
                 )
-                pid = project.id
-                ptitle = project.title
-                nodes_count = len(roadmap.get("nodes", []))
+            progress_md = (
+                f"✅ **步骤 1/3 完成**：已保存项目 #{created.project_id}「{created.title}」，"
+                f"共 {created.node_count} 个知识点\n\n"
+            )
+            if created.environment_status == "ready":
+                progress_md += "✅ **步骤 2/3 完成**：学习环境配置清单已生成\n\n"
+            else:
+                progress_md += f"⚠️ 环境清单生成失败（不影响学习）: {created.environment_error}\n\n"
+            yield created.project_id, progress_md + "⏳ 正在准备首批教学内容...", ""
+            with Session(engine) as session:
+                preparation = prepare_project_content(session, created.project_id)
+            pending_note = (
+                f"，剩余 {len(preparation.pending_node_ids)} 节后台生成中"
+                if preparation.pending_node_ids
+                else ""
+            )
+            final_md = (
+                progress_md
+                + f"✅ **步骤 3/3 完成**：已生成 {len(preparation.generated_node_ids)} 节教学内容{pending_note}\n\n"
+                + "---\n### 🎉 准备就绪！\n\n"
+                + f"现在请点击顶部 **「📚 学习工作台」** Tab，选择项目 #{created.project_id}。"
+            )
+            yield created.project_id, final_md, f"✅ 项目 #{created.project_id} 已就绪，去「📚 学习工作台」开始学习吧！"
+            return
         except Exception as e:
             logger.exception("保存项目失败")
             yield None, f"❌ 保存失败: {e}", ""
             return
-
-        progress_md = f"✅ **步骤 1/3 完成**：已保存项目 #{pid}「{ptitle}」，共 {nodes_count} 个知识点\n\n"
-        yield pid, progress_md + "⏳ 正在生成学习环境配置清单...", ""
-
-        # ---- 2. 生成环境配置清单 ----
-        try:
-            from learning_ext.progress.study import (
-                generate_env_checklist,
-                save_env_tasks,
-            )
-
-            env_md = generate_env_checklist(topic or "未命名选题", background or "")
-            with Session(engine) as session:
-                save_env_tasks(session, pid, env_md)
-            progress_md += "✅ **步骤 2/3 完成**：学习环境配置清单已生成（待你在工作台确认应用）\n\n"
-            yield (
-                pid,
-                progress_md
-                + "⏳ 正在为每个知识点搜集学习资料（这一步较慢，请耐心等待）...",
-                "",
-            )
-        except Exception as e:
-            logger.exception("环境清单生成失败")
-            env_md = ""
-            progress_md += f"⚠️ 环境清单生成失败（不影响学习）: {e}\n\n"
-            yield pid, progress_md + "⏳ 正在搜集知识点资料...", ""
-
-        # ---- 3. 预生成前几节教学内容 (串行, 确保用户一进工作台就有内容) ----
-        # ----    剩余节点后台慢慢生成 ----
-        from learning_ext.progress.study import (
-            generate_node_summary_to_db,
-            generate_summaries_background,
-        )
-
-        nodes = roadmap.get("nodes", [])
-        total = len(nodes)
-        PRE_GEN_COUNT = min(3, total)  # 先生成前 3 节
-
-        # 查出所有节点 id (按 code 排序)
-        with Session(engine) as session:
-            db_nodes = session.exec(
-                select(KnowledgeNode).where(KnowledgeNode.project_id == pid)
-            ).all()
-            db_nodes = sort_nodes_by_code(list(db_nodes))
-            ordered_ids = [n.id for n in db_nodes]
-
-        # 3a. 串行生成前 PRE_GEN_COUNT 节 (用户立即可见)
-        pre_done = 0
-        for i, nid in enumerate(ordered_ids[:PRE_GEN_COUNT]):
-            cur_md = (
-                progress_md
-                + f"⏳ **步骤 3/3**：正在生成前几节教学内容 ({i + 1}/{PRE_GEN_COUNT})... "
-                f"(剩余节点将在后台继续生成)\n\n"
-            )
-            yield pid, cur_md, ""
-            ok = generate_node_summary_to_db(
-                nid,
-                topic or "",
-                learning_goal=goal or "",
-                environment_context=env_md,
-            )
-            if ok:
-                pre_done += 1
-
-        # 3b. 剩余节点启动后台线程生成 (不阻塞 UI)
-        remaining_ids = ordered_ids[PRE_GEN_COUNT:]
-        if remaining_ids:
-            generate_summaries_background(
-                pid,
-                topic or "",
-                remaining_ids,
-                learning_goal=goal or "",
-                environment_context=env_md,
-            )
-            bg_note = f"，剩余 {len(remaining_ids)} 节后台生成中"
-        else:
-            bg_note = ""
-
-        # ---- 完成 ----
-        final_md = (
-            progress_md
-            + f"✅ **步骤 3/3 完成**：已生成前 {pre_done} 节教学内容{bg_note}\n\n"
-            + "> 💡 后台会继续生成后续课时内容，你学习时点开就能看到。\n\n"
-            + "---\n### 🎉 准备就绪！\n\n"
-            + f"现在请点击顶部 **「📚 学习工作台」** Tab，选择项目 #{pid}，"
-            + "按知识点顺序开始学习。系统会自动解锁前置依赖已掌握的后续知识点。\n\n"
-            + "> 💡 工作台里你可以：查看每个知识点的学习指南、标记学习状态、"
-            + "确认环境配置、做笔记。"
-        )
-        yield pid, final_md, f"✅ 项目 #{pid} 已就绪，去「📚 学习工作台」开始学习吧！"
 
     def _handle_load(self, project_id):
         """加载已有项目"""
@@ -448,7 +373,7 @@ class PathGeneratorPage(BasePage):
             return "", "{}", None, "⚠️ 请输入有效的项目 ID"
         try:
             with Session(engine) as session:
-                roadmap = load_roadmap(session, int(project_id))
+                roadmap = get_project_roadmap(session, int(project_id)).to_dict()
                 md = self._roadmap_to_markdown(roadmap)
                 return (
                     md,
@@ -519,8 +444,16 @@ class PathGeneratorPage(BasePage):
             logger.exception("删除项目失败")
             return self._refresh_projects(), f"❌ 删除失败: {e}"
 
-    def _handle_audit_project(self, project_id):
+    def _handle_audit_project(self, project_id, confirm=""):
         """审计旧项目路线，替换路线并批量重生成课程内容。"""
+        if (confirm or "").strip() != "REPLACE":
+            return (
+                self._refresh_projects(),
+                gr.update(),
+                gr.update(),
+                "⚠️ 路线替换会清除既有学习数据，请输入 REPLACE 确认。",
+                "⚠️ 未执行路线替换。",
+            )
         try:
             project_ids = self._parse_audit_project_ids(project_id)
             with Session(engine) as session:
@@ -557,11 +490,9 @@ class PathGeneratorPage(BasePage):
                         goal=project.goal,
                         weekly_hours=project.weekly_hours,
                     )
-                    replace_project_roadmap(session, pid, improved)
-
-                from learning_ext.progress.study import regenerate_all_content
-
-                regen = regenerate_all_content(project_id=pid, force=True)
+                    replacement = replace_project_roadmap_application(
+                        session, pid, improved, confirmed=True
+                    )
                 audit_md = self._audit_to_markdown(audit)
                 md = self._roadmap_to_markdown(improved)
                 results.append(
@@ -573,7 +504,7 @@ class PathGeneratorPage(BasePage):
                         "audit_md": audit_md,
                         "roadmap": improved,
                         "roadmap_md": md,
-                        "queued": regen["queued"],
+                        "queued": len(replacement.content_preparation.pending_node_ids),
                     }
                 )
                 last_improved = improved
@@ -669,23 +600,16 @@ class PathGeneratorPage(BasePage):
     def _refresh_projects(self):
         """刷新项目列表"""
         try:
-            from learning_ext.progress.study import get_project_progress
-
             with Session(engine) as session:
-                projects = session.exec(
-                    select(LearningProject)
-                    .order_by(LearningProject.id.desc())
-                    .limit(50)
-                ).all()
+                projects = list_projects(session)
                 rows = []
                 for p in projects:
-                    prog = get_project_progress(session, p.id)
                     rows.append(
                         [
                             p.id,
                             p.title,
                             p.topic[:40],
-                            f"{prog['done']}/{prog['total']} ({prog['pct']}%)",
+                            f"{p.progress['done']}/{p.progress['total']} ({p.progress['pct']}%)",
                             p.status,
                             p.created_at.strftime("%Y-%m-%d %H:%M"),
                         ]

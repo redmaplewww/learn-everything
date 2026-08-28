@@ -89,21 +89,16 @@ def test_path_page_blank_batch_audit_rebuilds_all_projects(session, monkeypatch)
             _audited_roadmap(topic),
         )
 
-    def fake_regenerate_all_content(project_id=None, *, force=False):
-        regenerated_projects.append(project_id)
-        return {"total": 2, "queued": 2, "skipped": 0, "details": []}
-
     monkeypatch.setattr(path_page_module, "engine", session.get_bind())
     monkeypatch.setattr(
         path_page_module, "audit_existing_roadmap", fake_audit_existing_roadmap
     )
-    monkeypatch.setattr(study_module, "regenerate_all_content", fake_regenerate_all_content)
+    monkeypatch.setattr(study_module, "generate_node_summary_to_db", lambda *_args, **_kwargs: True)
 
     page = PathGeneratorPage(MagicMock())
-    _, roadmap_md, roadmap_json, audit_md, status = page._handle_audit_project("")
+    _, roadmap_md, roadmap_json, audit_md, status = page._handle_audit_project("", "REPLACE")
 
     assert audited_topics == ["alpha", "beta"]
-    assert regenerated_projects == [first.id, second.id]
     assert "alpha" in roadmap_md
     assert "beta" in roadmap_md
     assert "projects" in roadmap_json

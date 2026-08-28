@@ -18,6 +18,16 @@ from ktem.app import BasePage
 from ktem.db.engine import engine
 from sqlmodel import Session, select
 
+from learning_ext.application import (
+    generate_node_content,
+    generate_node_resources,
+    generate_practice_lesson,
+    get_node_detail,
+    get_project_workspace,
+    list_projects,
+    save_node_note,
+    update_node_status,
+)
 from learning_ext.db.models import (
     KnowledgeEdge,
     KnowledgeNode,
@@ -49,7 +59,6 @@ from learning_ext.progress.study import (
     is_content_valid,
     sort_nodes_by_code,
     regenerate_all_content,
-    set_node_status,
 )
 from learning_ext.progress.audit import audit_node_content
 
@@ -705,38 +714,46 @@ class StudyWorkbenchPage(BasePage):
             )
         return "", ""
 
+    @staticmethod
+    def _format_environment_status(status):
+        return {
+            "done": "✅ 环境已配置",
+            "pending": "⚠️ 环境待配置",
+        }.get(status, "")
+
     def _render_resources_md(self, resources):
         lines = []
         for r in resources:
-            if r.rtype == "summary":
+            rtype = r.get("rtype", "") if isinstance(r, dict) else r.rtype
+            if rtype == "summary":
                 continue
-            icon = RESOURCE_ICON.get(r.rtype, "📄")
-            lines.append(f"### {icon} {r.title}")
-            lines.append(f"\n类型：`{(r.rtype or 'html').upper()}`")
-            if r.description:
-                lines.append(f"\n{r.description}")
-            if r.preview:
+            get = r.get if isinstance(r, dict) else lambda key, default="": getattr(r, key, default)
+            icon = RESOURCE_ICON.get(rtype, "📄")
+            lines.append(f"### {icon} {get('title')}")
+            lines.append(f"\n类型：`{(rtype or 'html').upper()}`")
+            if get("description"):
+                lines.append(f"\n{get('description')}")
+            if get("preview"):
                 lines.append("\n已拉取正文内容，后台已保存用于审计与后续引用。")
             else:
                 lines.append("\n*未能抓取到可读正文。*")
-            if r.url:
-                lines.append(f"\n来源：`{r.url}`")
+            if get("url"):
+                lines.append(f"\n来源：`{get('url')}`")
             lines.append("\n---")
         return "\n".join(lines) if lines else "*暂无可展示参考资料。*"
 
     def _render_practice_md(self, task):
-        if not task or not task.description:
+        description = task.get("description", "") if isinstance(task, dict) else getattr(task, "description", "")
+        if not task or not description:
             return "*本节暂无实操课程。高难/实操内容会自动生成，也可以点击「🧪 生成实操课程」。*"
-        return task.description
+        return description
 
     # ---- 自动初始化 (页面加载时执行, 预加载第一节内容) ----
     def _auto_init(self):
         """页面加载后: 填充项目/课程下拉框 + 预加载第一个可学节点的教学内容。"""
         try:
             with Session(engine) as s:
-                projs = s.exec(
-                    select(LearningProject).order_by(LearningProject.id.desc())
-                ).all()
+                projs = list_projects(s)
                 if not projs:
                     return [
                         gr.update(),
@@ -758,10 +775,10 @@ class StudyWorkbenchPage(BasePage):
                     choices=[(f"#{p.id} {p.title[:30]}", str(p.id)) for p in projs],
                     value=str(pid),
                 )
-                prog = get_project_progress(s, pid)
-                progress_md = self._build_progress_md(prog)
-                env_md, env_status = self._load_env(s, pid)
-                nodes_data = self._build_nodes_data(s, pid)
+                workspace = get_project_workspace(s, pid)
+                progress_md = self._build_progress_md(workspace.progress)
+                env_status = self._format_environment_status(workspace.environment["status"])
+                nodes_data = [node.to_dict() for node in workspace.nodes]
                 course_c = self._build_drop_choices(nodes_data)
 
                 # 预加载第一个节点的内容
@@ -774,26 +791,22 @@ class StudyWorkbenchPage(BasePage):
                 if nodes_data:
                     first = nodes_data[0]
                     first_node_id = first["id"]
-                    node = s.get(KnowledgeNode, first_node_id)
-                    if node:
-                        proj = s.get(LearningProject, pid)
-                        header = self._build_node_header(node, proj)
-                        guide = self._ensure_course_content(
-                            first_node_id, proj.topic if proj else "", node.description
-                        )
-                        guide = self._truncate_guide(guide)
-                        practice_md = self._render_practice_md(
-                            get_practice_task(s, first_node_id)
-                        )
-                        note = get_note(s, first_node_id)
-                        note_content = note.content if note else ""
-                        resources = get_resources(s, first_node_id)
-                        if resources:
-                            res_md = self._render_resources_md(resources)
-                        else:
-                            res_md = self._ensure_resources_background(
-                                first_node_id, pid
-                            )
+                    detail = get_node_detail(s, first_node_id)
+                    header = (
+                        f"### [{detail.code}] {detail.title}\n\n"
+                        f"`{detail.est_hours}h` `难度{detail.difficulty}/5` "
+                        f"`{STATUS_LABEL.get(detail.status, detail.status)}`"
+                    )
+                    guide = self._truncate_guide(
+                        detail.description or self._missing_course_content("")
+                    )
+                    practice_md = self._render_practice_md(detail.practice)
+                    note_content = detail.note["content"] if detail.note else ""
+                    res_md = (
+                        self._render_resources_md(detail.resources)
+                        if detail.resources
+                        else RESOURCE_EMPTY_MD
+                    )
                 # 选中第一个节点
                 course_update = gr.update(
                     choices=course_c,
@@ -841,9 +854,7 @@ class StudyWorkbenchPage(BasePage):
     def _refresh_projects(self):
         try:
             with Session(engine) as session:
-                projects = session.exec(
-                    select(LearningProject).order_by(LearningProject.id.desc())
-                ).all()
+                projects = list_projects(session)
                 choices = [(f"#{p.id} {p.title[:30]}", str(p.id)) for p in projects]
                 cur = str(projects[0].id) if projects else None
                 return gr.update(choices=choices, value=cur)
@@ -857,11 +868,16 @@ class StudyWorkbenchPage(BasePage):
             pid = int(project_id)
         except (ValueError, TypeError):
             return "*ID无效*", gr.update(), None, ""
-        with Session(engine) as session:
-            prog = get_project_progress(session, pid)
-            progress_md = self._build_progress_md(prog)
-            env_md, env_status = self._load_env(session, pid)
-            nodes_data = self._build_nodes_data(session, pid)
+        try:
+            with Session(engine) as session:
+                workspace = get_project_workspace(session, pid)
+                progress_md = self._build_progress_md(workspace.progress)
+                env_status = self._format_environment_status(
+                    workspace.environment["status"]
+                )
+                nodes_data = [node.to_dict() for node in workspace.nodes]
+        except Exception:
+            return "*项目不存在*", gr.update(), None, ""
         course_c = self._build_drop_choices(nodes_data)
         return (
             progress_md,
@@ -968,34 +984,26 @@ class StudyWorkbenchPage(BasePage):
         except (ValueError, TypeError):
             return None, "*ID无效*", "", "*本节暂无实操课程。*", "", RESOURCE_EMPTY_MD, [], []
 
-        with Session(engine) as session:
-            node = session.get(KnowledgeNode, nid)
-            if not node:
-                return None, "*知识点不存在*", "", "*本节暂无实操课程。*", "", RESOURCE_EMPTY_MD, [], []
-            proj = session.get(LearningProject, node.project_id)
-            header = self._build_node_header(node, proj)
-            guide = node.description or ""
-            practice = get_practice_task(session, nid)
-            practice_md = self._render_practice_md(practice)
-            note = get_note(session, nid)
-            note_content = note.content if note else ""
-            resources = get_resources(session, nid)
-            res_md = (
-                self._render_resources_md(resources)
-                if resources
-                else self._ensure_resources_background(nid, node.project_id)
+        try:
+            with Session(engine) as session:
+                detail = get_node_detail(session, nid)
+            header = (
+                f"### [{detail.code}] {detail.title}\n\n"
+                f"`{detail.est_hours}h` `难度{detail.difficulty}/5` "
+                f"`{STATUS_LABEL.get(detail.status, detail.status)}`"
             )
-            topic = proj.topic if proj else ""
-
-        logger.info(
-            f"[工作台] 加载节点 [{node.code}] {node.title}, guide长度={len(guide)}"
-        )
-
-        guide = self._ensure_course_content(nid, topic, guide)
-        guide = self._truncate_guide(guide)
-        logger.info(f"[工作台] 返回内容, guide长度={len(guide)}")
-
-        return nid, header, guide, practice_md, note_content, res_md, [], []
+            return (
+                nid,
+                header,
+                self._truncate_guide(detail.description or self._missing_course_content("")),
+                self._render_practice_md(detail.practice),
+                detail.note["content"] if detail.note else "",
+                self._render_resources_md(detail.resources) if detail.resources else RESOURCE_EMPTY_MD,
+                [],
+                [],
+            )
+        except Exception as error:
+            return None, f"*加载失败: {error}*", "", "*本节暂无实操课程。*", "", RESOURCE_EMPTY_MD, [], []
 
     def _on_course_change(self, node_id):
         if not node_id or node_id == "__stage__":
@@ -1052,7 +1060,7 @@ class StudyWorkbenchPage(BasePage):
             return "⚠️ 请先选择知识点"
         try:
             with Session(engine) as s:
-                save_note(s, int(node_id), int(project_id), content)
+                save_node_note(s, int(node_id), content)
             return "✅ 笔记已保存"
         except Exception as e:
             return f"❌ {e}"
@@ -1063,15 +1071,10 @@ class StudyWorkbenchPage(BasePage):
             return "*请先选择知识点*", "⚠️ 请先选择知识点"
         try:
             with Session(engine) as s:
-                node = s.get(KnowledgeNode, int(node_id))
-                proj = s.get(LearningProject, int(project_id)) if project_id else None
-                topic = proj.topic if proj else ""
-            ok = generate_practice_lesson_to_db(int(node_id), topic, force=True)
-            if not ok:
+                result = generate_practice_lesson(s, int(node_id), force=True)
+            if result.status == "failed":
                 return "*生成失败，请稍后重试。*", "❌ 生成失败"
-            with Session(engine) as s:
-                task = get_practice_task(s, int(node_id))
-            return self._render_practice_md(task), "✅ 已生成实操课程"
+            return self._render_practice_md(result.detail.practice), "✅ 已生成实操课程"
         except Exception as e:
             return f"*生成失败: {e}*", f"❌ {e}"
 
@@ -1117,16 +1120,13 @@ class StudyWorkbenchPage(BasePage):
             return "*请先选择知识点*", "⚠️ 请先选择知识点"
         try:
             with Session(engine) as s:
-                node = s.get(KnowledgeNode, int(node_id))
-                proj = s.get(LearningProject, int(project_id)) if project_id else None
-                topic = proj.topic if proj else ""
-                items = generate_resources(node, topic)
-                saved = save_resources_to_db(s, int(node_id), int(project_id), items)
-                res_md = self._render_resources_md(saved)
-            pulled = len(saved)
-            if pulled == 0:
+                result = generate_node_resources(s, int(node_id))
+            if result.status == "failed":
+                return self._render_resources_md(result.detail.resources), f"❌ {result.error}"
+            res_md = self._render_resources_md(result.detail.resources)
+            if result.resource_count == 0:
                 return res_md, "⚠️ 未拉取到可展示参考资料"
-            return res_md, f"✅ 已拉取 {pulled} 份参考资料"
+            return res_md, f"✅ 已拉取 {result.resource_count} 份参考资料"
         except Exception as e:
             return f"*生成失败: {e}*", f"❌ {e}"
 
@@ -1309,16 +1309,16 @@ class StudyWorkbenchPage(BasePage):
         try:
             nid = int(node_id)
             with Session(engine) as s:
-                proj = s.get(LearningProject, int(project_id)) if project_id else None
-                topic = proj.topic if proj else ""
-            ok = generate_node_summary_to_db(nid, topic, force=True)
-            if not ok:
+                result = generate_node_content(s, nid, force=True)
+            if result.status == "failed":
                 return "❌ 生成失败", gr.update(), gr.update()
-            with Session(engine) as s:
-                node = s.get(KnowledgeNode, nid)
-                proj = s.get(LearningProject, node.project_id)
-                header = self._build_node_header(node, proj)
-                guide = node.description or ""
+            detail = result.detail
+            header = (
+                f"### [{detail.code}] {detail.title}\n\n"
+                f"`{detail.est_hours}h` `难度{detail.difficulty}/5` "
+                f"`{STATUS_LABEL.get(detail.status, detail.status)}`"
+            )
+            guide = detail.description or ""
             return "✅ 已重新生成", header, guide
         except Exception as e:
             return f"❌ {e}", gr.update(), gr.update()
@@ -1354,8 +1354,8 @@ class StudyWorkbenchPage(BasePage):
         try:
             nid = int(node_id)
             with Session(engine) as s:
-                node = set_node_status(s, nid, status)
-                pid = node.project_id
+                result = update_node_status(s, nid, status)
+                pid = result.workspace.project["id"]
                 proj = s.get(LearningProject, pid)
                 topic = proj.topic if proj else ""
                 if status == STATUS_MASTERED:
@@ -1363,9 +1363,8 @@ class StudyWorkbenchPage(BasePage):
                     pids = [n.id for n in pending if n.id != nid]
                     if pids:
                         generate_summaries_background(pid, topic, pids)
-                prog = get_project_progress(s, pid)
-                progress_md = self._build_progress_md(prog)
-                nodes_data = self._build_nodes_data(s, pid)
+                progress_md = self._build_progress_md(result.workspace.progress)
+                nodes_data = [node.to_dict() for node in result.workspace.nodes]
             course_c = self._build_drop_choices(nodes_data)
             if status == STATUS_MASTERED:
                 msg = "🎉 已掌握！下一节内容正在后台生成。"

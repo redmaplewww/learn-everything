@@ -1,0 +1,26 @@
+flowchart LR
+    U["学习目标<br/>主题 / 背景 / 时间"] --> P["学习项目<br/>LearningProject"]
+    P --> R["生成与审计路线<br/>LLM"]
+    R --> D["知识路线 DAG<br/>KnowledgeNode + 依赖边"]
+    D --> N["选择下一节点<br/>依赖 / 状态 / 掌握度"]
+
+    subgraph LOOP["知识点学习闭环"]
+        N --> L["接收与理解<br/>课程 / 资料 / 助教"]
+        L --> A["主动加工<br/>练习 / 笔记 / 费曼"]
+        A --> E["产生学习证据<br/>测验 / FSRS / 实操"]
+        E --> M["评估掌握度<br/>quiz + memory + status"]
+        M --> Q["决定下一动作<br/>继续 / 补学 / 复习"]
+        Q --> N
+    end
+
+    Q -->|已掌握| T["解锁后续节点"]
+    Q -->|薄弱| W["补学 / 重讲 / 再练"]
+    Q -->|需要复习| F["FSRS 调度"]
+    T --> N
+    W --> L
+    F --> E
+
+    E --> S["学习数据<br/>ProgressRecord / ReviewLog / QuizAttempt"]
+    S --> B["看板与日报"]
+    B --> X["调整路线<br/>目标 / 时间 / 学习数据变化"]
+    X --> R

@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="drawio" version="26.0.0">
+  <diagram name="学习 Agent 链路闭环">
+    <mxGraphModel dx="1600" dy="980" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="980" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="学习 Agent 的链路闭环&#xa;学习证据 → 掌握度 → 下一步行动" style="text;html=1;align=left;verticalAlign=middle;fontSize=23;fontStyle=1;fontColor=#1F2937;" vertex="1" parent="1">
+          <mxGeometry x="50" y="30" width="560" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="plan_label" value="规划层：路线变化时执行" style="text;html=1;align=left;verticalAlign=middle;fontSize=13;fontColor=#5B6B7A;" vertex="1" parent="1">
+          <mxGeometry x="50" y="110" width="280" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="u" value="学习目标&#xa;主题 / 背景 / 时间" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;strokeWidth=2;fontColor=#1F2937;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="50" y="145" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="p" value="学习项目&#xa;LearningProject" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;strokeWidth=2;fontColor=#1F2937;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="270" y="145" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="r" value="生成与审计路线&#xa;LLM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;strokeWidth=2;fontColor=#1F2937;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="490" y="145" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="d" value="知识路线 DAG&#xa;KnowledgeNode + 依赖边" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;strokeWidth=2;fontColor=#1F2937;fontSize=14;" vertex="1" parent="1">
+          <mxGeometry x="490" y="250" width="180" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="loop_frame" value="知识点学习闭环" style="swimlane;startSize=32;rounded=1;dashed=1;html=1;fillColor=none;strokeColor=#82B366;strokeWidth=1.5;fontColor=#4F772D;fontSize=15;fontStyle=1;verticalAlign=top;spacingTop=7;container=1;pointerEvents=0;" vertex="1" parent="1">
+          <mxGeometry x="430" y="370" width="780" height="460" as="geometry" />
+        </mxCell>
+        <mxCell id="n" value="选择下一节点&#xa;依赖 / 状态 / 掌握度" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;strokeWidth=2;fontColor=#1F2937;fontSize=14;" vertex="1" parent="loop_frame">
+          <mxGeometry x="40" y="160" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="l" value="接收与理解&#xa;课程 / 资料 / 助教" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;strokeWidth=2;fontColor=#1F2937;fontSize=14;" vertex="1" parent="loop_frame">
+          <mxGeometry x="170" y="40" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="a" value="主动加工&#xa;练习 / 笔记 / 费曼" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;strokeWidth=2;fontColor=#1F2937;fontSize=14;" vertex="1" parent="loop_frame">
+          <mxGeometry x="390" y="40" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="e" value="产生学习证据&#xa;测验 / FSRS / 实操" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;strokeWidth=2;fontColor=#1F2937;fontSize=14;" vertex="1" parent="loop_frame">
+          <mxGeometry x="510" y="210" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="m" value="评估掌握度&#xa;quiz + memory + status" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;strokeWidth=2;fontColor=#1F2937;fontSize=14;" vertex="1" parent="loop_frame">
+          <mxGeometry x="300" y="320" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="q" value="决定下一动作&#xa;继续 / 补学 / 复习" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;strokeWidth=2;fontColor=#1F2937;fontSize=14;" vertex="1" parent="loop_frame">
+          <mxGeometry x="90" y="320" width="180" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="mastered_hint" value="已掌握&#xa;解锁后续节点" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#D5E8D4;strokeColor=#82B366;strokeWidth=1.5;fontColor=#355A2A;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="210" y="640" width="180" height="52" as="geometry" />
+        </mxCell>
+        <mxCell id="weak_hint" value="薄弱：补学 / 重讲 / 再练" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F8CECC;strokeColor=#B85450;strokeWidth=1.5;fontColor=#7B322F;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="730" y="285" width="205" height="45" as="geometry" />
+        </mxCell>
+        <mxCell id="review_hint" value="需要复习：FSRS 调度" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;strokeWidth=1.5;fontColor=#7A5100;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="1050" y="850" width="180" height="45" as="geometry" />
+        </mxCell>
+
+        <mxCell id="feedback_label" value="反馈层：长期观察与路线调节" style="text;html=1;align=left;verticalAlign=middle;fontSize=13;fontColor=#5B6B7A;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="390" width="280" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="s" value="学习数据&#xa;ProgressRecord / ReviewLog / QuizAttempt" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;strokeWidth=2;fontColor=#1F2937;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="430" width="270" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="b" value="看板与日报&#xa;观察长期趋势" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;strokeWidth=2;fontColor=#1F2937;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="550" width="270" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="x" value="调整路线&#xa;目标 / 时间 / 学习数据变化" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE6CC;strokeColor=#D79B00;strokeWidth=2;fontColor=#1F2937;fontSize=13;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="670" width="270" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="edge_u_p" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;endSize=10;strokeColor=#6C8EBF;strokeWidth=2.5;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="u" target="p"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="edge_p_r" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;endSize=10;strokeColor=#6C8EBF;strokeWidth=2.5;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="p" target="r"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="edge_r_d" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;endSize=10;strokeColor=#6C8EBF;strokeWidth=2.5;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="r" target="d"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="edge_d_n" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;endSize=10;strokeColor=#6C8EBF;strokeWidth=2.5;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="d" target="n"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="edge_n_l" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;endSize=10;strokeColor=#6FAE5B;strokeWidth=3;exitX=0.5;exitY=0;entryX=0;entryY=0.5;" edge="1" parent="1" source="n" target="l"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="560" y="445" /></Array></mxGeometry></mxCell>
+        <mxCell id="edge_l_a" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;endSize=10;strokeColor=#6FAE5B;strokeWidth=3;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="l" target="a"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="edge_a_e" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;endSize=10;strokeColor=#6FAE5B;strokeWidth=3;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="a" target="e"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="910" y="520" /><mxPoint x="1030" y="520" /></Array></mxGeometry></mxCell>
+        <mxCell id="edge_e_m" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;endSize=10;strokeColor=#6FAE5B;strokeWidth=3;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="e" target="m"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1030" y="660" /><mxPoint x="820" y="660" /></Array></mxGeometry></mxCell>
+        <mxCell id="edge_m_q" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;endSize=10;strokeColor=#6FAE5B;strokeWidth=3;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1" source="m" target="q"><mxGeometry relative="1" as="geometry" /></mxCell>
+
+        <mxCell id="edge_q_mastered" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;endSize=10;strokeColor=#82B366;strokeWidth=2.5;exitX=0;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="q" target="n"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="450" y="725" /><mxPoint x="450" y="565" /></Array></mxGeometry></mxCell>
+        <mxCell id="edge_q_weak" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;endSize=10;strokeColor=#B85450;strokeWidth=2.5;exitX=0.5;exitY=0;entryX=0.5;entryY=1;" edge="1" parent="1" source="q" target="l"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="690" y="690" /><mxPoint x="690" y="500" /></Array></mxGeometry></mxCell>
+        <mxCell id="edge_q_review" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;endSize=10;strokeColor=#D79B00;strokeWidth=2.5;exitX=0.75;exitY=1;entryX=0.5;entryY=1;" edge="1" parent="1" source="q" target="e"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="655" y="850" /><mxPoint x="1030" y="850" /></Array></mxGeometry></mxCell>
+
+        <mxCell id="edge_e_s" value="记录证据" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;endSize=10;strokeColor=#D79B00;strokeWidth=2.5;dashed=1;dashPattern=8 6;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="e" target="s"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1225" y="615" /><mxPoint x="1225" y="465" /></Array></mxGeometry></mxCell>
+        <mxCell id="edge_s_b" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;endSize=10;strokeColor=#D79B00;strokeWidth=2.5;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="s" target="b"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="edge_b_x" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;endSize=10;strokeColor=#D79B00;strokeWidth=2.5;exitX=0.5;exitY=1;entryX=0.5;entryY=0;" edge="1" parent="1" source="b" target="x"><mxGeometry relative="1" as="geometry" /></mxCell>
+        <mxCell id="edge_x_r" value="调整路线" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=block;endFill=1;endSize=10;strokeColor=#D79B00;strokeWidth=2.5;dashed=1;dashPattern=8 6;fontSize=11;labelBackgroundColor=#FFFFFF;exitX=1;exitY=0.5;entryX=0.5;entryY=0;" edge="1" parent="1" source="x" target="r"><mxGeometry relative="1" as="geometry"><Array as="points"><mxPoint x="1560" y="705" /><mxPoint x="1560" y="105" /><mxPoint x="580" y="105" /></Array></mxGeometry></mxCell>
+
+        <mxCell id="legend" value="颜色含义：蓝色 = 路线规划；绿色粗线 = 核心学习闭环；红色 = 薄弱回流；橙色 = FSRS 复习与长期反馈" style="text;html=1;align=left;verticalAlign=middle;fontSize=11;fontColor=#5B6B7A;" vertex="1" parent="1">
+          <mxGeometry x="50" y="920" width="1000" height="25" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

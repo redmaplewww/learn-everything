@@ -61,6 +61,8 @@ def session(_db_engine) -> Iterator:
             "le_quiz_attempt",
             "le_quiz_question",
             "le_quiz",
+            "le_resource",
+            "le_note",
             "le_progress",
             "le_task",
             "le_kedge",
@@ -129,6 +131,22 @@ def mock_llm(monkeypatch):
                         "difficulty": 4,
                         "prerequisites": ["1.2"],
                     },
+                ],
+            }
+        if "现有路线 JSON" in prompt:
+            return {
+                "summary": "已调整的测试路线",
+                "stages": [{"name": "基础", "stage": "base", "goal": "打底"}],
+                "nodes": [
+                    {
+                        "code": "1.1",
+                        "title": "调整后概念",
+                        "description": "调整后的基础",
+                        "stage": "base",
+                        "est_hours": 2.0,
+                        "difficulty": 2,
+                        "prerequisites": [],
+                    }
                 ],
             }
         if "卡片" in prompt:

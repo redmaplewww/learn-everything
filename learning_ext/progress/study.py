@@ -399,12 +399,16 @@ def generate_practice_lesson_to_db(
     force: bool = False,
     learning_goal: str = "",
     environment_context: str = "",
+    engine=None,
 ) -> bool:
     """Generate and persist a practical lesson for a node."""
     try:
-        from ktem.db.engine import engine as _engine
+        if engine is None:
+            from ktem.db.engine import engine as _engine
 
-        with Session(_engine) as session:
+            engine = _engine
+
+        with Session(engine) as session:
             node = session.get(KnowledgeNode, node_id)
             if not node:
                 return False
@@ -537,6 +541,7 @@ def generate_node_summary_to_db(
     force: bool = False,
     learning_goal: str = "",
     environment_context: str = "",
+    engine=None,
 ) -> bool:
     """为单个节点生成教学内容并落库 (可在后台线程调用, 自建独立 session)。
 
@@ -545,9 +550,12 @@ def generate_node_summary_to_db(
         True 成功/已存在, False 失败
     """
     try:
-        from ktem.db.engine import engine as _engine
+        if engine is None:
+            from ktem.db.engine import engine as _engine
 
-        with Session(_engine) as s:
+            engine = _engine
+
+        with Session(engine) as s:
             node = s.get(KnowledgeNode, node_id)
             if not node:
                 return False
@@ -583,6 +591,7 @@ def generate_node_summary_to_db(
                         project_topic,
                         learning_goal=learning_goal,
                         environment_context=environment_context,
+                        engine=engine,
                     )
                 except Exception as e:
                     logger.warning(f"自动生成实操课程失败 (node {node_id}): {e}")

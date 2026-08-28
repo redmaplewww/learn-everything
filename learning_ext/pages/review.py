@@ -17,10 +17,9 @@ from learning_ext.fsrs_review import (
     RATING_EASY,
     RATING_GOOD,
     RATING_HARD,
-    get_due_cards,
     get_review_stats,
-    review_card,
 )
+from learning_ext.application import get_due_cards, review_fsrs_card
 
 logger = logging.getLogger(__name__)
 
@@ -111,15 +110,15 @@ class ReviewPage(BasePage):
     def _load_next(self):
         try:
             with Session(engine) as session:
-                cards = get_due_cards(session, user_id="default", limit=1)
-                if not cards:
+                queue = get_due_cards(session, user_id="default", limit=1)
+                if not queue.cards:
                     return (
                         "*🎉 太棒了！当前没有到期卡片，今天复习任务完成啦！*",
                         "",
                         None,
                         "✅ 今日复习完成",
                     )
-                c = cards[0]
+                c = queue.cards[0]
                 return f"### {c.front}", c.back, c.id, ""
         except Exception as e:
             logger.exception("加载卡片失败")
@@ -130,7 +129,7 @@ class ReviewPage(BasePage):
             return "⚠️ 请先点击「加载下一张」"
         try:
             with Session(engine) as session:
-                review_card(session, int(card_id), rating, "default")
+                review_fsrs_card(session, int(card_id), rating, user_id="default")
                 return "✅ 已记录评分，继续下一张..."
         except Exception as e:
             logger.exception("复习失败")

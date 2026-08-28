@@ -7,10 +7,45 @@ from __future__ import annotations
 
 import json
 import inspect
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+
+
+class TestReviewPageLogic:
+    def test_review_page_loads_due_card_and_submits_rating(self, session, sample_project, monkeypatch):
+        from sqlmodel import select
+
+        import learning_ext.pages.review as review_page_module
+        from learning_ext.db.models import Card, KnowledgeNode
+        from learning_ext.pages.review import ReviewPage
+
+        node = session.exec(
+            select(KnowledgeNode).where(KnowledgeNode.project_id == sample_project.id)
+        ).first()
+        card = Card(
+            user_id="default",
+            node_id=node.id,
+            project_id=sample_project.id,
+            front="复习问题",
+            back="复习答案",
+            next_review=datetime.utcnow() - timedelta(minutes=1),
+        )
+        session.add(card)
+        session.commit()
+        monkeypatch.setattr(review_page_module, "engine", session.get_bind())
+        page = ReviewPage(MagicMock())
+
+        front, back, card_id, status = page._load_next()
+        assert front == "### 复习问题"
+        assert back == "复习答案"
+        assert card_id == card.id
+        assert status == ""
+        assert "已记录评分" in page._review(card_id, 3)
+        session.expire_all()
+        assert session.get(Card, card_id).reps == 1
 
 
 @pytest.fixture
@@ -180,6 +215,30 @@ class TestSaveWithSetup:
 
         assert generated_codes == ["2.1", "2.2", "2.3"]
 
+    def test_page_route_creation_matches_application_persistence(
+        self, path_page, session, mock_llm, monkeypatch
+    ):
+        import learning_ext.pages.path_generator as path_page_module
+        from learning_ext.application import get_project_roadmap
+
+        monkeypatch.setattr(path_page_module, "engine", session.get_bind())
+        _, roadmap_json, status = path_page._handle_generate("学 Python", "", "完成练习", 8)
+
+        assert "✅" in status
+        preview = json.loads(roadmap_json)
+        results = list(
+            path_page._handle_save_with_setup(
+                "学 Python", "", "完成练习", 8, roadmap_json
+            )
+        )
+        project_id = results[-1][0]
+        persisted = get_project_roadmap(session, project_id)
+
+        assert [node["code"] for node in persisted.nodes] == [
+            node["code"] for node in preview["nodes"]
+        ]
+        assert "准备就绪" in results[-1][1]
+
 
 class TestLearningAppEventRegistration:
     def test_learning_app_does_not_use_inert_word_lookup_injection_paths(self):
@@ -326,7 +385,7 @@ class TestStudyWorkbenchPageLogic:
         assert "word_lookup_js = Path(_HERE, script_path).read_text" in source
         assert "<script>\\n{word_lookup_js}\\n</script>" in source
 
-    def test_selecting_short_description_generates_course_content(
+    def test_selecting_short_description_does_not_generate_course_content(
         self, session, sample_project, monkeypatch
     ):
         from sqlmodel import Session, select
@@ -365,9 +424,8 @@ class TestStudyWorkbenchPageLogic:
         current_node_id, _, guide, *_ = page._on_node_select(str(node.id))
 
         assert current_node_id == node.id
-        assert called["args"] == (node.id, sample_project.topic)
-        assert "完整课程正文" in guide
-        assert "路线里的短说明" not in guide
+        assert called == {}
+        assert "路线里的短说明" in guide
 
     def test_status_update_keeps_selected_course_visible(
         self, session, sample_project, monkeypatch
@@ -420,17 +478,24 @@ class TestStudyWorkbenchPageLogic:
         )
         called = {}
 
-        def fake_generate_node_summary_to_db(node_id, project_topic, *, force=False):
+        from types import SimpleNamespace
+
+        def fake_generate_node_content(_session, node_id, *, force=False):
             called["force"] = force
-            with Session(session.get_bind()) as s:
-                fresh = s.get(KnowledgeNode, node_id)
-                fresh.description = generated_content
-                s.add(fresh)
-                s.commit()
-            return True
+            return SimpleNamespace(
+                status="generated",
+                detail=SimpleNamespace(
+                    code=node.code,
+                    title=node.title,
+                    est_hours=node.est_hours,
+                    difficulty=node.difficulty,
+                    status=node.status,
+                    description=generated_content,
+                ),
+            )
 
         monkeypatch.setattr(
-            wb, "generate_node_summary_to_db", fake_generate_node_summary_to_db
+            wb, "generate_node_content", fake_generate_node_content
         )
 
         _, _, guide = page._regen_current_node(str(node.id), str(sample_project.id))
@@ -493,7 +558,7 @@ class TestStudyWorkbenchPageLogic:
         assert "微调流程" in result[3]
         assert "python train.py" in result[3]
 
-    def test_selecting_course_starts_background_resource_fetch_when_empty(
+    def test_selecting_course_does_not_start_background_resource_fetch_when_empty(
         self, session, sample_project, monkeypatch
     ):
         from sqlmodel import select
@@ -525,10 +590,10 @@ class TestStudyWorkbenchPageLogic:
 
         result = page._on_node_select(str(node.id))
 
-        assert captured["args"] == (node.id, sample_project.id)
-        assert "自动拉取参考资料" in result[5]
+        assert captured == {}
+        assert "拉取参考资料" in result[5]
 
-    def test_auto_init_starts_background_resource_fetch_for_first_course(
+    def test_auto_init_does_not_start_background_resource_fetch_for_first_course(
         self, session, sample_project, monkeypatch
     ):
         from sqlmodel import select
@@ -560,8 +625,8 @@ class TestStudyWorkbenchPageLogic:
 
         result = page._auto_init()
 
-        assert captured["args"] == (node.id, sample_project.id)
-        assert "自动拉取参考资料" in result[10]
+        assert captured == {}
+        assert "拉取参考资料" in result[10]
 
     def test_append_latest_assistant_reply_adds_supplement_without_rewriting(
         self, session, sample_project, monkeypatch
