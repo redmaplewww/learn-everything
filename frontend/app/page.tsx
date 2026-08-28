@@ -2,10 +2,10 @@
 
 import {
   AlertCircle,
+  ArrowLeft,
   ArrowRight,
   BookOpenCheck,
   CheckCircle2,
-  CircleDot,
   Plus,
   LoaderCircle,
   RefreshCw,
@@ -46,6 +46,16 @@ import { ModelConfigurationPanel } from "../features/configuration/ModelConfigur
 import { ResourceLibraryPanel } from "../features/resources/ResourceLibraryPanel";
 
 type LoadState = "idle" | "loading" | "ready" | "error";
+type WorkspaceTab = "dashboard" | "roadmap" | "review" | "rag" | "quiz" | "models";
+
+const workspaceTabs: Array<{ id: WorkspaceTab; label: string }> = [
+  { id: "dashboard", label: "学习概览" },
+  { id: "roadmap", label: "学习路线" },
+  { id: "review", label: "到期复习" },
+  { id: "rag", label: "RAG 问答" },
+  { id: "quiz", label: "查漏测验" },
+  { id: "models", label: "模型配置" },
+];
 
 const statusLabels: Record<string, string> = {
   pending: "待开始",
@@ -57,7 +67,7 @@ const statusLabels: Record<string, string> = {
 
 function formatError(error: unknown) {
   if (error instanceof ApiError) {
-    return error.message;
+    return error.requestId ? `${error.message}（请求编号：${error.requestId}）` : error.message;
   }
   return "无法连接本地学习服务，请确认 FastAPI 已启动。";
 }
@@ -253,6 +263,8 @@ function Workspace({
   const [detailState, setDetailState] = useState<LoadState>("idle");
   const [detailError, setDetailError] = useState<string | null>(null);
   const [noteContent, setNoteContent] = useState("");
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>("dashboard");
+  const [roadmapView, setRoadmapView] = useState<"list" | "detail">("list");
   const detailPanelRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -262,8 +274,10 @@ function Workspace({
   }, [detailState]);
 
   const openDetail = async (nodeId: number) => {
+    setRoadmapView("detail");
     setDetailState("loading");
     setDetailError(null);
+    setDetail(null);
     try {
       const next = await getNodeDetail(nodeId);
       setDetail(next);
@@ -273,6 +287,11 @@ function Workspace({
       setDetailError(formatError(loadError));
       setDetailState("error");
     }
+  };
+  const returnToRoadmap = () => {
+    setRoadmapView("list");
+    setDetailState("idle");
+    setDetailError(null);
   };
   const runDetailAction = async (action: () => Promise<{ detail: NodeDetail }>) => {
     setDetailState("loading");
@@ -311,7 +330,7 @@ function Workspace({
     );
   }
 
-  const { project, progress, environment, nodes } = workspace;
+  const { project, progress, nodes } = workspace;
   const progressWidth = progress.total === 0 ? 0 : Math.round((progress.done / progress.total) * 100);
   return (
     <main className="workspace">
@@ -336,57 +355,81 @@ function Workspace({
         </div>
       </section>
 
-      {environment.description && (
-        <section className="environment-note">
-          <CircleDot size={18} />
-          <div><strong>环境准备</strong><span>{environment.description}</span></div>
-          <em>{environment.status}</em>
-        </section>
-      )}
-
-      <section className="section-heading">
-        <div><p className="eyebrow">ROADMAP</p><h3>学习节点</h3></div>
-        <span>{roadmap?.stages.length ?? 0} 个阶段</span>
-      </section>
-
-      <div className="node-list">
-        {nodes.length === 0 && <div className="empty-nodes">该项目尚无节点。可返回 Gradio 路线页继续完善。</div>}
-        {nodes.map((node) => {
-          const roadmapNode = roadmapNodes.get(node.id);
-          return (
-            <article className={`node-row node-${node.status}`} key={node.id}>
-              <div className="node-marker" aria-hidden="true">{node.status === "mastered" ? <CheckCircle2 size={20} /> : node.code}</div>
-              <div className="node-content">
-                <div className="node-title-row"><h4>{node.title}</h4><span>{roadmapNode?.stage || node.stage}</span></div>
-                <p>{nodePreview(node.description)}</p>
-                <div className="node-meta">
-                  <span>{node.est_hours} 小时</span><span>难度 {node.difficulty}/5</span><span>{statusLabels[node.status] ?? node.status}</span>
-                </div>
-                {node.resources.length > 0 && <p className="resource-count">已关联 {node.resources.length} 项学习资料</p>}
-                <button type="button" className="text-action node-detail-button" onClick={() => void openDetail(node.id)}>查看详情</button>
-              </div>
-              <StatusButton node={node} pending={statusPendingId === node.id} onUpdate={(status) => onUpdateStatus(node, status)} />
-            </article>
-          );
-        })}
+      <div className="workspace-tabs" role="tablist" aria-label="学习功能">
+        {workspaceTabs.map((tab) => (
+          <button
+            key={tab.id}
+            id={`workspace-tab-${tab.id}`}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === tab.id}
+            aria-controls={`workspace-panel-${tab.id}`}
+            className={activeTab === tab.id ? "active" : ""}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
-      {detailState === "loading" && <section ref={detailPanelRef} className="node-detail-panel"><LoaderCircle className="spin" size={18} />正在读取节点详情</section>}
-      {detailError && <section ref={detailPanelRef} className="node-detail-panel detail-error"><AlertCircle size={18} />{detailError}</section>}
-      {detail && detailState === "ready" && <section ref={detailPanelRef} className="node-detail-panel">
-        <div className="preview-heading"><div><p className="eyebrow">LESSON DETAIL</p><h3>{detail.title}</h3></div><span>{detail.code}</span></div>
-        <article className="lesson-content">{detail.description || "当前没有完整课程内容。"}</article>
-        <div className="detail-actions"><button type="button" className="secondary-button" onClick={() => void runDetailAction(() => generateNodeContent(detail.id, true))}>生成课程</button><button type="button" className="secondary-button" onClick={() => void runDetailAction(() => generatePracticeLesson(detail.id))}>生成实操</button><button type="button" className="secondary-button" onClick={() => void runDetailAction(() => generateNodeResources(detail.id))}>拉取资料</button></div>
-        <textarea className="detail-note" value={noteContent} onChange={(event) => setNoteContent(event.target.value)} placeholder="记录你的理解、疑问和总结" />
-        <button type="button" className="command-button" onClick={() => void runDetailAction(() => saveNodeNote(detail.id, noteContent))}>保存笔记</button>
-        {detail.practice && <article className="detail-subsection"><strong>{detail.practice.title}</strong><pre>{detail.practice.description}</pre></article>}
-        {detail.resources.map((resource) => <a className="detail-resource" href={resource.url} target="_blank" rel="noreferrer" key={resource.id ?? resource.url}>{resource.title}</a>)}
-      </section>}
-      <ReviewPanel projectId={project.id} />
-      <QuizPanel projectId={project.id} nodes={nodes} />
-      <ResourceLibraryPanel nodes={nodes} />
-      <RagChatPanel nodes={nodes} />
-      <ModelConfigurationPanel />
-      <DashboardPanel projectId={project.id} />
+
+      <section
+        id={`workspace-panel-${activeTab}`}
+        className="workspace-tab-panel"
+        role="tabpanel"
+        aria-labelledby={`workspace-tab-${activeTab}`}
+      >
+        {activeTab === "roadmap" && roadmapView === "list" && <>
+          <section className="roadmap-pane" aria-label="学习路线">
+          <div className="section-heading">
+            <div><p className="eyebrow">ROADMAP</p><h3>学习路线</h3></div>
+            <span>{roadmap?.stages.length ?? 0} 个阶段</span>
+          </div>
+          <div className="node-list">
+            {nodes.length === 0 && <div className="empty-nodes">该项目尚无节点。可返回 Gradio 路线页继续完善。</div>}
+            {nodes.map((node) => {
+              const roadmapNode = roadmapNodes.get(node.id);
+              return (
+                <article className={`node-row node-${node.status}`} key={node.id}>
+                  <div className="node-marker" aria-hidden="true">{node.status === "mastered" ? <CheckCircle2 size={20} /> : node.code}</div>
+                  <div className="node-content">
+                    <div className="node-title-row"><h4>{node.title}</h4><span>{roadmapNode?.stage || node.stage}</span></div>
+                    <p>{nodePreview(node.description)}</p>
+                    <div className="node-meta">
+                      <span>{node.est_hours} 小时</span><span>难度 {node.difficulty}/5</span><span>{statusLabels[node.status] ?? node.status}</span>
+                    </div>
+                    <p className="node-prerequisites">{roadmapNode?.prerequisites?.length ? `前置节点：${roadmapNode.prerequisites.join("、")}` : "可直接开始"}</p>
+                    {node.resources.length > 0 && <p className="resource-count">已关联 {node.resources.length} 项学习资料</p>}
+                    <button type="button" className="text-action node-detail-button" onClick={() => void openDetail(node.id)}>查看详情</button>
+                  </div>
+                  <StatusButton node={node} pending={statusPendingId === node.id} onUpdate={(status) => onUpdateStatus(node, status)} />
+                </article>
+              );
+            })}
+          </div>
+          </section>
+        </>}
+        {activeTab === "roadmap" && roadmapView === "detail" && <>
+          <div className="detail-navigation">
+            <button type="button" className="secondary-button" onClick={returnToRoadmap}><ArrowLeft size={16} />返回学习路线</button>
+          </div>
+          {detailState === "loading" && <section ref={detailPanelRef} className="node-detail-panel"><LoaderCircle className="spin" size={18} />正在读取节点详情</section>}
+          {detailError && <section ref={detailPanelRef} className="node-detail-panel detail-error"><AlertCircle size={18} />{detailError}</section>}
+          {detail && detailState === "ready" && <section ref={detailPanelRef} className="node-detail-panel">
+            <div className="preview-heading"><div><p className="eyebrow">LESSON DETAIL</p><h3>{detail.title}</h3></div><span>{detail.code}</span></div>
+            <article className="lesson-content">{detail.description || "当前没有完整课程内容。"}</article>
+            <div className="detail-actions"><button type="button" className="secondary-button" onClick={() => void runDetailAction(() => generateNodeContent(detail.id, true))}>生成课程</button><button type="button" className="secondary-button" onClick={() => void runDetailAction(() => generatePracticeLesson(detail.id))}>生成实操</button><button type="button" className="secondary-button" onClick={() => void runDetailAction(() => generateNodeResources(detail.id))}>拉取资料</button></div>
+            <textarea className="detail-note" value={noteContent} onChange={(event) => setNoteContent(event.target.value)} placeholder="记录你的理解、疑问和总结" />
+            <button type="button" className="command-button" onClick={() => void runDetailAction(() => saveNodeNote(detail.id, noteContent))}>保存笔记</button>
+            {detail.practice && <article className="detail-subsection"><strong>{detail.practice.title}</strong><pre>{detail.practice.description}</pre></article>}
+            {detail.resources.map((resource) => <a className="detail-resource" href={resource.url} target="_blank" rel="noreferrer" key={resource.id ?? resource.url}>{resource.title}</a>)}
+          </section>}
+        </>}
+        {activeTab === "dashboard" && <DashboardPanel projectId={project.id} />}
+        {activeTab === "review" && <ReviewPanel projectId={project.id} />}
+        {activeTab === "rag" && <><ResourceLibraryPanel nodes={nodes} /><RagChatPanel nodes={nodes} /></>}
+        {activeTab === "quiz" && <QuizPanel projectId={project.id} nodes={nodes} />}
+        {activeTab === "models" && <ModelConfigurationPanel />}
+      </section>
     </main>
   );
 }
