@@ -391,17 +391,18 @@ function Workspace({
               const roadmapNode = roadmapNodes.get(node.id);
               return (
                 <article className={`node-row node-${node.status}`} key={node.id}>
-                  <div className="node-marker" aria-hidden="true">{node.status === "mastered" ? <CheckCircle2 size={20} /> : node.code}</div>
-                  <div className="node-content">
-                    <div className="node-title-row"><h4>{node.title}</h4><span>{roadmapNode?.stage || node.stage}</span></div>
-                    <p>{nodePreview(node.description)}</p>
-                    <div className="node-meta">
-                      <span>{node.est_hours} 小时</span><span>难度 {node.difficulty}/5</span><span>{statusLabels[node.status] ?? node.status}</span>
+                  <button type="button" className="node-open-button" onClick={() => void openDetail(node.id)} aria-label={`查看 ${node.title} 的详细内容`}>
+                    <div className="node-marker" aria-hidden="true">{node.status === "mastered" ? <CheckCircle2 size={20} /> : node.code}</div>
+                    <div className="node-content">
+                      <div className="node-title-row"><h4>{node.title}</h4><span>{roadmapNode?.stage || node.stage}</span></div>
+                      <p>{nodePreview(node.description)}</p>
+                      <div className="node-meta">
+                        <span>{node.est_hours} 小时</span><span>难度 {node.difficulty}/5</span><span>{statusLabels[node.status] ?? node.status}</span>
+                      </div>
+                      <p className="node-prerequisites">{roadmapNode?.prerequisites?.length ? `前置节点：${roadmapNode.prerequisites.join("、")}` : "可直接开始"}</p>
+                      {node.resources.length > 0 && <p className="resource-count">已关联 {node.resources.length} 项学习资料</p>}
                     </div>
-                    <p className="node-prerequisites">{roadmapNode?.prerequisites?.length ? `前置节点：${roadmapNode.prerequisites.join("、")}` : "可直接开始"}</p>
-                    {node.resources.length > 0 && <p className="resource-count">已关联 {node.resources.length} 项学习资料</p>}
-                    <button type="button" className="text-action node-detail-button" onClick={() => void openDetail(node.id)}>查看详情</button>
-                  </div>
+                  </button>
                   <StatusButton node={node} pending={statusPendingId === node.id} onUpdate={(status) => onUpdateStatus(node, status)} />
                 </article>
               );
