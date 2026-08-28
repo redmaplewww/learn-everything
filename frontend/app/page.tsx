@@ -263,10 +263,12 @@ function Workspace({
   const [detail, setDetail] = useState<NodeDetail | null>(null);
   const [detailState, setDetailState] = useState<LoadState>("idle");
   const [detailError, setDetailError] = useState<string | null>(null);
+  const [detailAction, setDetailAction] = useState<"content" | "practice" | "resources" | "note" | null>(null);
+  const [detailActionError, setDetailActionError] = useState<string | null>(null);
   const [noteContent, setNoteContent] = useState("");
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("dashboard");
   const [roadmapView, setRoadmapView] = useState<"list" | "detail">("list");
-  const detailPanelRef = useRef<HTMLElement | null>(null);
+  const detailPanelRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (detailState !== "idle") {
@@ -278,6 +280,7 @@ function Workspace({
     setRoadmapView("detail");
     setDetailState("loading");
     setDetailError(null);
+    setDetailActionError(null);
     setDetail(null);
     try {
       const next = await getNodeDetail(nodeId);
@@ -293,18 +296,22 @@ function Workspace({
     setRoadmapView("list");
     setDetailState("idle");
     setDetailError(null);
+    setDetailActionError(null);
   };
-  const runDetailAction = async (action: () => Promise<{ detail: NodeDetail }>) => {
-    setDetailState("loading");
-    setDetailError(null);
+  const runDetailAction = async (
+    kind: "content" | "practice" | "resources" | "note",
+    action: () => Promise<{ detail: NodeDetail }>,
+  ) => {
+    setDetailAction(kind);
+    setDetailActionError(null);
     try {
       const result = await action();
       setDetail(result.detail);
       setNoteContent(result.detail.note?.content ?? noteContent);
-      setDetailState("ready");
     } catch (actionError) {
-      setDetailError(formatError(actionError));
-      setDetailState("error");
+      setDetailActionError(formatError(actionError));
+    } finally {
+      setDetailAction(null);
     }
   };
 
@@ -386,7 +393,7 @@ function Workspace({
             <span>{roadmap?.stages.length ?? 0} 个阶段</span>
           </div>
           <div className="node-list">
-            {nodes.length === 0 && <div className="empty-nodes">该项目尚无节点。可返回 Gradio 路线页继续完善。</div>}
+            {nodes.length === 0 && <div className="empty-nodes">该项目暂无学习节点，请新建或重新生成学习路线。</div>}
             {nodes.map((node) => {
               const roadmapNode = roadmapNodes.get(node.id);
               return (
@@ -416,15 +423,26 @@ function Workspace({
           </div>
           {detailState === "loading" && <section ref={detailPanelRef} className="node-detail-panel"><LoaderCircle className="spin" size={18} />正在读取节点详情</section>}
           {detailError && <section ref={detailPanelRef} className="node-detail-panel detail-error"><AlertCircle size={18} />{detailError}</section>}
-          {detail && detailState === "ready" && <section ref={detailPanelRef} className="node-detail-panel">
-            <div className="preview-heading"><div><p className="eyebrow">LESSON DETAIL</p><h3>{detail.title}</h3></div><span>{detail.code}</span></div>
-            <MarkdownContent content={detail.description || "当前没有完整课程内容。"} />
-            <div className="detail-actions"><button type="button" className="secondary-button" onClick={() => void runDetailAction(() => generateNodeContent(detail.id, true))}>生成课程</button><button type="button" className="secondary-button" onClick={() => void runDetailAction(() => generatePracticeLesson(detail.id))}>生成实操</button><button type="button" className="secondary-button" onClick={() => void runDetailAction(() => generateNodeResources(detail.id))}>拉取资料</button></div>
-            <textarea className="detail-note" value={noteContent} onChange={(event) => setNoteContent(event.target.value)} placeholder="记录你的理解、疑问和总结" />
-            <button type="button" className="command-button" onClick={() => void runDetailAction(() => saveNodeNote(detail.id, noteContent))}>保存笔记</button>
-            {detail.practice && <article className="detail-subsection"><strong>{detail.practice.title}</strong><pre>{detail.practice.description}</pre></article>}
-            {detail.resources.map((resource) => <a className="detail-resource" href={resource.url} target="_blank" rel="noreferrer" key={resource.id ?? resource.url}>{resource.title}</a>)}
-          </section>}
+          {detail && detailState === "ready" && <div ref={detailPanelRef} className="node-detail-windows">
+            {detailActionError && <div className="detail-action-error"><AlertCircle size={18} />{detailActionError}</div>}
+            <section className="node-detail-panel">
+              <div className="preview-heading"><div><p className="eyebrow">LESSON DETAIL / 课程详情</p><h3>{detail.title}</h3></div><span>{detail.code}</span></div>
+              <MarkdownContent content={detail.description || "当前没有完整课程内容。"} />
+              <div className="detail-actions"><button type="button" className="secondary-button" disabled={detailAction !== null} onClick={() => void runDetailAction("content", () => generateNodeContent(detail.id, detail.has_content))}>{detailAction === "content" && <LoaderCircle className="spin" size={16} />}{detail.has_content ? "重新生成课程" : "生成课程"}</button></div>
+              <textarea className="detail-note" value={noteContent} disabled={detailAction !== null} onChange={(event) => setNoteContent(event.target.value)} placeholder="记录你的理解、疑问和总结" />
+              <button type="button" className="command-button" disabled={detailAction !== null} onClick={() => void runDetailAction("note", () => saveNodeNote(detail.id, noteContent))}>{detailAction === "note" && <LoaderCircle className="spin" size={16} />}保存笔记</button>
+            </section>
+            <section className="node-detail-panel">
+              <div className="preview-heading"><div><p className="eyebrow">PRACTICE LESSON / 实操课程</p><h3>{detail.practice?.title ?? "尚未生成实操课程"}</h3></div></div>
+              {detail.practice ? <pre className="detail-practice-content">{detail.practice.description}</pre> : <p className="detail-empty">生成课程后，可在这里完成针对当前知识点的实操练习。</p>}
+              <div className="detail-actions"><button type="button" className="secondary-button" disabled={detailAction !== null} onClick={() => void runDetailAction("practice", () => generatePracticeLesson(detail.id))}>{detailAction === "practice" && <LoaderCircle className="spin" size={16} />}{detail.practice ? "重新生成实操" : "生成实操"}</button></div>
+            </section>
+            <section className="node-detail-panel">
+              <div className="preview-heading"><div><p className="eyebrow">REFERENCE MATERIALS / 参考资料</p><h3>{detail.resources.length ? `${detail.resources.length} 项已关联资料` : "尚未拉取参考资料"}</h3></div></div>
+              {detail.resources.length ? <div className="detail-resource-list">{detail.resources.map((resource) => <a className="detail-resource" href={resource.url} target="_blank" rel="noreferrer" key={resource.id ?? resource.url}><strong>{resource.title}</strong><span>{resource.rtype} · {resource.source}</span>{resource.description && <small>{resource.description}</small>}</a>)}</div> : <p className="detail-empty">拉取后，资料会保留在当前节点并显示在此处。</p>}
+              <div className="detail-actions"><button type="button" className="secondary-button" disabled={detailAction !== null} onClick={() => void runDetailAction("resources", () => generateNodeResources(detail.id))}>{detailAction === "resources" && <LoaderCircle className="spin" size={16} />}拉取资料</button></div>
+            </section>
+          </div>}
         </>}
         {activeTab === "dashboard" && <DashboardPanel projectId={project.id} />}
         {activeTab === "review" && <ReviewPanel projectId={project.id} />}
@@ -464,14 +482,16 @@ export default function HomePage() {
     }
   }, []);
 
-  const loadProjects = useCallback(async () => {
+  const loadProjects = useCallback(async (preferredProjectId?: number) => {
     setProjectState("loading");
     setError(null);
     try {
       const nextProjects = await listProjects();
       setProjects(nextProjects);
       setProjectState("ready");
-      const nextId = selectedId && nextProjects.some((project) => project.id === selectedId)
+      const nextId = preferredProjectId && nextProjects.some((project) => project.id === preferredProjectId)
+        ? preferredProjectId
+        : selectedId && nextProjects.some((project) => project.id === selectedId)
         ? selectedId
         : nextProjects[0]?.id ?? null;
       setSelectedId(nextId);
@@ -499,8 +519,7 @@ export default function HomePage() {
   const showCreatedProject = (projectId: number) => {
     setView("workspace");
     setSelectedId(projectId);
-    void loadWorkspace(projectId);
-    void loadProjects();
+    void loadProjects(projectId);
   };
 
   const changeNodeStatus = async (node: WorkspaceNode, status: string) => {
@@ -531,7 +550,7 @@ export default function HomePage() {
   return (
     <div className="app-shell">
       <ProjectList projects={projects} selectedId={view === "workspace" ? selectedId : null} state={projectState} error={error} onSelect={chooseProject} onRetry={() => void loadProjects()} onCreate={() => setView("create")} />
-      {view === "create" ? <RoadmapCreation onCreated={showCreatedProject} /> : <Workspace workspace={workspace} roadmap={roadmap} state={workspaceState} error={error} statusPendingId={statusPendingId} onRetry={() => selectedId && void loadWorkspace(selectedId)} onUpdateStatus={changeNodeStatus} />}
+      {view === "create" ? <RoadmapCreation onCreated={showCreatedProject} /> : <Workspace key={selectedId ?? "empty"} workspace={workspace} roadmap={roadmap} state={workspaceState} error={error} statusPendingId={statusPendingId} onRetry={() => selectedId && void loadWorkspace(selectedId)} onUpdateStatus={changeNodeStatus} />}
     </div>
   );
 }
