@@ -67,9 +67,15 @@ def _environment() -> dict[str, str]:
     env["PYTHONPATH"] = os.pathsep.join(python_paths)
     env["HF_HUB_OFFLINE"] = env.get("HF_HUB_OFFLINE", "1")
     env["TRANSFORMERS_OFFLINE"] = env.get("TRANSFORMERS_OFFLINE", "1")
+    env["PYTHONUTF8"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
     for key in ("COHERE_API_KEY", "VOYAGE_API_KEY", "MISTRAL_API_KEY", "GOOGLE_API_KEY"):
         env.setdefault(key, "placeholder-key-1234567890")
     env["NEXT_PUBLIC_LEARNING_API_BASE"] = f"http://{HOST}:{API_PORT}/api/v1"
+    if env.get("LEARNING_DEV_DATA_DIR"):
+        env["THEFLOW_SETTINGS_MODULE"] = "learning_ext.dev_flowsettings"
+    else:
+        env.pop("THEFLOW_SETTINGS_MODULE", None)
     return env
 
 

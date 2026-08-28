@@ -20,6 +20,8 @@ kotaemon\.venv\Scripts\python.exe scripts\start_frontend_dev.py
 
 脚本会启动 FastAPI `http://127.0.0.1:8000` 和 Next.js `http://127.0.0.1:3000`。开发态前端通过本机 CORS 直连 API；构建后的静态页面由 FastAPI 在 `http://127.0.0.1:8000/` 同源提供。日志写入 `logs/frontend-dev-api.log` 与 `logs/frontend-dev-next.log`；按 `Ctrl+C` 会回收两个子进程。端口已被占用时脚本会拒绝启动并提示对应端口。
 
+浏览器开发服务默认使用 `kotaemon/ktem_app_data` 的正式 SQLite。需要用隔离数据进行开发或回归时，先设置 `LEARNING_DEV_DATA_DIR`，再运行启动命令；该变量会将服务切换到指定的数据目录，而不会改写正式 SQLite。
+
 当前 `run.bat` 和 exe 仍打开 Gradio，作为迁移期间的回退入口；桌面启动链将在后续阶段切换为同一套 Next.js 页面。
 
 ### 打包成 exe 分发
