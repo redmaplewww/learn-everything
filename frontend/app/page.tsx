@@ -142,12 +142,14 @@ function ProjectList({
   );
 }
 
+type StatusNode = Pick<WorkspaceNode, "id" | "title" | "status">;
+
 function StatusButton({
   node,
   pending,
   onUpdate,
 }: {
-  node: WorkspaceNode;
+  node: StatusNode;
   pending: boolean;
   onUpdate: (status: string) => void;
 }) {
@@ -257,7 +259,7 @@ function Workspace({
   error: string | null;
   statusPendingId: number | null;
   onRetry: () => void;
-  onUpdateStatus: (node: WorkspaceNode, status: string) => void;
+  onUpdateStatus: (node: StatusNode, status: string) => Promise<boolean>;
 }) {
   const roadmapNodes = useMemo(() => new Map(roadmap?.nodes.map((node) => [node.id, node]) ?? []), [roadmap]);
   const [detail, setDetail] = useState<NodeDetail | null>(null);
@@ -269,6 +271,7 @@ function Workspace({
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("dashboard");
   const [roadmapView, setRoadmapView] = useState<"list" | "detail">("list");
   const detailPanelRef = useRef<HTMLDivElement | null>(null);
+  const detailRequestRef = useRef(0);
 
   useEffect(() => {
     if (detailState !== "idle") {
@@ -277,41 +280,53 @@ function Workspace({
   }, [detailState]);
 
   const openDetail = async (nodeId: number) => {
+    const requestId = ++detailRequestRef.current;
     setRoadmapView("detail");
     setDetailState("loading");
     setDetailError(null);
     setDetailActionError(null);
+    setDetailAction(null);
     setDetail(null);
     try {
       const next = await getNodeDetail(nodeId);
+      if (requestId !== detailRequestRef.current) return;
       setDetail(next);
       setNoteContent(next.note?.content ?? "");
       setDetailState("ready");
     } catch (loadError) {
+      if (requestId !== detailRequestRef.current) return;
       setDetailError(formatError(loadError));
       setDetailState("error");
     }
   };
   const returnToRoadmap = () => {
+    ++detailRequestRef.current;
     setRoadmapView("list");
     setDetailState("idle");
     setDetailError(null);
     setDetailActionError(null);
+    setDetailAction(null);
   };
   const runDetailAction = async (
     kind: "content" | "practice" | "resources" | "note",
-    action: () => Promise<{ detail: NodeDetail }>,
+    action: () => Promise<{ detail: NodeDetail; status?: string; error?: string | null }>,
   ) => {
+    const requestId = ++detailRequestRef.current;
     setDetailAction(kind);
     setDetailActionError(null);
     try {
       const result = await action();
+      if (requestId !== detailRequestRef.current) return;
       setDetail(result.detail);
-      setNoteContent(result.detail.note?.content ?? noteContent);
+      if (kind === "note") setNoteContent(result.detail.note?.content ?? noteContent);
+      if (result.status === "failed") {
+        setDetailActionError(result.error ?? "当前操作失败，请检查模型配置后重试。");
+      }
     } catch (actionError) {
+      if (requestId !== detailRequestRef.current) return;
       setDetailActionError(formatError(actionError));
     } finally {
-      setDetailAction(null);
+      if (requestId === detailRequestRef.current) setDetailAction(null);
     }
   };
 
@@ -424,9 +439,10 @@ function Workspace({
           {detailState === "loading" && <section ref={detailPanelRef} className="node-detail-panel"><LoaderCircle className="spin" size={18} />正在读取节点详情</section>}
           {detailError && <section ref={detailPanelRef} className="node-detail-panel detail-error"><AlertCircle size={18} />{detailError}</section>}
           {detail && detailState === "ready" && <div ref={detailPanelRef} className="node-detail-windows">
-            {detailActionError && <div className="detail-action-error"><AlertCircle size={18} />{detailActionError}</div>}
+            {detailActionError && <div className="detail-action-error" role="alert"><AlertCircle size={18} />{detailActionError}</div>}
             <section className="node-detail-panel">
               <div className="preview-heading"><div><p className="eyebrow">LESSON DETAIL / 课程详情</p><h3>{detail.title}</h3></div><span>{detail.code}</span></div>
+              <StatusButton node={detail} pending={statusPendingId === detail.id} onUpdate={async (status) => { const prior = detail; setDetail({ ...detail, status }); if (!await onUpdateStatus(detail, status)) setDetail(prior); }} />
               <MarkdownContent content={detail.description || "当前没有完整课程内容。"} />
               <div className="detail-actions"><button type="button" className="secondary-button" disabled={detailAction !== null} onClick={() => void runDetailAction("content", () => generateNodeContent(detail.id, detail.has_content))}>{detailAction === "content" && <LoaderCircle className="spin" size={16} />}{detail.has_content ? "重新生成课程" : "生成课程"}</button></div>
               <textarea className="detail-note" value={noteContent} disabled={detailAction !== null} onChange={(event) => setNoteContent(event.target.value)} placeholder="记录你的理解、疑问和总结" />
@@ -434,7 +450,7 @@ function Workspace({
             </section>
             <section className="node-detail-panel">
               <div className="preview-heading"><div><p className="eyebrow">PRACTICE LESSON / 实操课程</p><h3>{detail.practice?.title ?? "尚未生成实操课程"}</h3></div></div>
-              {detail.practice ? <pre className="detail-practice-content">{detail.practice.description}</pre> : <p className="detail-empty">生成课程后，可在这里完成针对当前知识点的实操练习。</p>}
+              {detail.practice ? <div className="detail-practice-content"><MarkdownContent content={detail.practice.description} /></div> : <p className="detail-empty">生成课程后，可在这里完成针对当前知识点的实操练习。</p>}
               <div className="detail-actions"><button type="button" className="secondary-button" disabled={detailAction !== null} onClick={() => void runDetailAction("practice", () => generatePracticeLesson(detail.id))}>{detailAction === "practice" && <LoaderCircle className="spin" size={16} />}{detail.practice ? "重新生成实操" : "生成实操"}</button></div>
             </section>
             <section className="node-detail-panel">
@@ -522,8 +538,8 @@ export default function HomePage() {
     void loadProjects(projectId);
   };
 
-  const changeNodeStatus = async (node: WorkspaceNode, status: string) => {
-    if (!workspace || status === node.status) return;
+  const changeNodeStatus = async (node: StatusNode, status: string) => {
+    if (!workspace || status === node.status) return true;
     const priorWorkspace = workspace;
     setStatusPendingId(node.id);
     setError(null);
@@ -542,9 +558,11 @@ export default function HomePage() {
     } catch (updateError) {
       setWorkspace(priorWorkspace);
       setError(formatError(updateError));
+      return false;
     } finally {
       setStatusPendingId(null);
     }
+    return true;
   };
 
   return (

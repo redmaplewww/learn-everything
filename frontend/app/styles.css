@@ -83,8 +83,11 @@ h1 { margin-bottom: 0; font-size: 30px; line-height: 1.1; }
 .node-meta { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 12px; color: var(--muted); font-size: 12px; font-weight: 700; }
 .node-prerequisites { margin: 9px 0 0 !important; color: var(--forest) !important; font-size: 12px !important; font-weight: 700; }
 .resource-count { color: var(--forest) !important; font-size: 12px !important; font-weight: 700; }
-.node-detail-panel { display: grid; gap: 14px; margin-top: 30px; padding: 22px; background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--forest); border-radius: 3px; }
+.node-detail-windows { display: grid; gap: 18px; margin-top: 30px; }
+.node-detail-panel { display: grid; gap: 14px; padding: 22px; background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--forest); border-radius: 3px; }
+.detail-navigation + .node-detail-panel { margin-top: 30px; }
 .detail-error { color: #8e392b; border-left-color: var(--coral); }
+.detail-action-error { display: flex; align-items: center; gap: 8px; padding: 12px 14px; color: #8e392b; background: #fff0ed; border-left: 4px solid var(--coral); }
 .lesson-content { max-height: 560px; overflow: auto; color: var(--ink); line-height: 1.75; }
 .lesson-content > :first-child { margin-top: 0; }
 .lesson-content > :last-child { margin-bottom: 0; }
@@ -104,9 +107,14 @@ h1 { margin-bottom: 0; font-size: 30px; line-height: 1.1; }
 .lesson-content th { background: #e4f0e7; font-weight: 800; }
 .detail-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .detail-note { width: 100%; min-height: 110px; padding: 10px; border: 1px solid var(--line); border-radius: 3px; font: inherit; line-height: 1.6; resize: vertical; }
-.detail-subsection { padding-top: 14px; border-top: 1px solid var(--line); }
-.detail-subsection pre { overflow: auto; white-space: pre-wrap; color: var(--muted); font: inherit; line-height: 1.55; }
-.detail-resource { color: var(--forest); font-weight: 800; }
+.detail-practice-content { margin: 0; padding: 15px; color: var(--ink); background: #f4f7f5; border: 1px solid var(--line); }
+.detail-practice-content .lesson-content { max-height: 560px; overflow: auto; }
+.node-detail-panel > .status-control { justify-content: start; max-width: none; }
+.detail-empty { margin: 0; color: var(--muted); line-height: 1.65; }
+.detail-resource-list { display: grid; gap: 8px; }
+.detail-resource { display: grid; gap: 3px; padding: 12px; color: var(--forest); background: #f4f7f5; border: 1px solid var(--line); text-decoration: none; }
+.detail-resource:hover { border-color: var(--forest); background: #edf5dc; }
+.detail-resource span, .detail-resource small { color: var(--muted); font-size: 12px; font-weight: 400; }
 .review-panel { display: grid; gap: 14px; margin-top: 30px; padding-top: 24px; border-top: 2px solid var(--ink); }
 .review-state { display: flex; align-items: center; gap: 9px; padding: 14px; color: var(--muted); background: #fff; border: 1px solid var(--line); }
 .review-card { display: grid; gap: 14px; padding: 20px; background: #edf5dc; border: 1px solid #b7c9bc; border-left: 4px solid var(--lime); }
