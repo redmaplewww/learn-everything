@@ -19,7 +19,9 @@ def api_client(session):
 
 
 def test_app_serves_exported_frontend_from_configured_directory(tmp_path):
-    (tmp_path / "index.html").write_text("<main>Next.js 静态前端</main>", encoding="utf-8")
+    (tmp_path / "index.html").write_text(
+        "<main>Next.js 静态前端</main>", encoding="utf-8"
+    )
 
     response = TestClient(create_app(frontend_dir=tmp_path)).get("/")
 
@@ -28,7 +30,9 @@ def test_app_serves_exported_frontend_from_configured_directory(tmp_path):
 
 
 def test_dev_mode_does_not_serve_exported_frontend(tmp_path, monkeypatch):
-    (tmp_path / "index.html").write_text("<main>Next.js 静态前端</main>", encoding="utf-8")
+    (tmp_path / "index.html").write_text(
+        "<main>Next.js 静态前端</main>", encoding="utf-8"
+    )
     monkeypatch.setenv("LEARNING_DEV_MODE", "1")
 
     response = TestClient(create_app(frontend_dir=tmp_path)).get("/")
@@ -62,7 +66,9 @@ def test_api_assigns_and_propagates_request_id(session, caplog):
     )
     assert supplied.status_code == 200
     assert supplied.headers["x-request-id"] == "route-check-123"
-    assert any("request_id=route-check-123" in record.getMessage() for record in caplog.records)
+    assert any(
+        "request_id=route-check-123" in record.getMessage() for record in caplog.records
+    )
 
 
 def test_get_project_roadmap_returns_node_ids(sample_project, session):
@@ -79,8 +85,12 @@ def test_project_reads_return_not_found(session):
     assert client.get("/api/v1/projects/999/workspace").status_code == 404
 
 
-def test_workspace_read_returns_existing_data_without_generation(sample_project, session):
-    response = api_client(session).get(f"/api/v1/projects/{sample_project.id}/workspace")
+def test_workspace_read_returns_existing_data_without_generation(
+    sample_project, session
+):
+    response = api_client(session).get(
+        f"/api/v1/projects/{sample_project.id}/workspace"
+    )
 
     assert response.status_code == 200
     assert response.json()["project"]["id"] == sample_project.id
@@ -108,10 +118,18 @@ def test_patch_node_status_maps_invalid_and_unknown_errors(sample_project, sessi
     ).first()
     client = api_client(session)
 
-    assert client.patch(
-        f"/api/v1/nodes/{node.id}/status", json={"status": "unknown"}
-    ).status_code == 400
-    assert client.patch("/api/v1/nodes/999/status", json={"status": "learning"}).status_code == 404
+    assert (
+        client.patch(
+            f"/api/v1/nodes/{node.id}/status", json={"status": "unknown"}
+        ).status_code
+        == 400
+    )
+    assert (
+        client.patch(
+            "/api/v1/nodes/999/status", json={"status": "learning"}
+        ).status_code
+        == 404
+    )
     assert client.patch(f"/api/v1/nodes/{node.id}/status", json={}).status_code == 422
 
 
@@ -241,7 +259,11 @@ def test_node_detail_read_and_explicit_operations(sample_project, session, monke
     client = api_client(session)
     assert client.get(f"/api/v1/nodes/{node.id}").status_code == 200
 
-    monkeypatch.setattr(study_application, "generate_node_summary_to_db", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(
+        study_application,
+        "generate_node_summary_to_db",
+        lambda *_args, **_kwargs: False,
+    )
     generated = client.post(f"/api/v1/nodes/{node.id}/content", json={"force": True})
     assert generated.status_code == 200
     assert generated.json()["status"] == "failed"
@@ -252,8 +274,17 @@ def test_node_detail_read_and_explicit_operations(sample_project, session, monke
 
 
 def test_review_routes_return_due_queue_and_persist_rating(sample_project, session):
-    node = session.exec(select(KnowledgeNode).where(KnowledgeNode.project_id == sample_project.id)).first()
-    card = Card(user_id="default", node_id=node.id, project_id=sample_project.id, front="问题", back="答案", next_review=datetime.utcnow() - timedelta(minutes=1))
+    node = session.exec(
+        select(KnowledgeNode).where(KnowledgeNode.project_id == sample_project.id)
+    ).first()
+    card = Card(
+        user_id="default",
+        node_id=node.id,
+        project_id=sample_project.id,
+        front="问题",
+        back="答案",
+        next_review=datetime.utcnow() - timedelta(minutes=1),
+    )
     session.add(card)
     session.commit()
     client = api_client(session)
@@ -262,7 +293,10 @@ def test_review_routes_return_due_queue_and_persist_rating(sample_project, sessi
     assert due.status_code == 200
     assert due.json()["cards"][0]["id"] == card.id
 
-    reviewed = client.post(f"/api/v1/reviews/{card.id}", json={"rating": 3, "project_id": sample_project.id})
+    reviewed = client.post(
+        f"/api/v1/reviews/{card.id}",
+        json={"rating": 3, "project_id": sample_project.id},
+    )
     assert reviewed.status_code == 200
     assert reviewed.json()["card"]["reps"] == 1
 
@@ -289,7 +323,9 @@ def test_quiz_routes_generate_and_grade(mock_llm, sample_project, session):
     assert answered.json()["is_correct"] is True
 
 
-def test_dashboard_and_export_routes_return_application_results(sample_project, session):
+def test_dashboard_and_export_routes_return_application_results(
+    sample_project, session
+):
     client = api_client(session)
 
     dashboard = client.get(f"/api/v1/projects/{sample_project.id}/dashboard")
@@ -347,7 +383,9 @@ def test_rag_stream_route_encodes_application_events_as_sse(session):
     assert "event: complete" in response.text
 
 
-def test_resource_upload_stream_persists_index_status(sample_project, session, tmp_path, monkeypatch):
+def test_resource_upload_stream_persists_index_status(
+    sample_project, session, tmp_path, monkeypatch
+):
     from api.dependencies import get_rag_gateway
     from learning_ext.adapters.kotaemon_rag import IndexingEvent, RagCollection
 
@@ -356,8 +394,12 @@ def test_resource_upload_stream_persists_index_status(sample_project, session, t
             return RagCollection(id="collection-7", name=name)
 
         def index_documents(self, request):
-            yield IndexingEvent(kind="progress", path=request.paths[0], message="开始索引")
-            yield IndexingEvent(kind="completed", path=request.paths[0], source_id="source-7")
+            yield IndexingEvent(
+                kind="progress", path=request.paths[0], message="开始索引"
+            )
+            yield IndexingEvent(
+                kind="completed", path=request.paths[0], source_id="source-7"
+            )
 
     node = session.exec(
         select(KnowledgeNode).where(KnowledgeNode.project_id == sample_project.id)
@@ -370,7 +412,9 @@ def test_resource_upload_stream_persists_index_status(sample_project, session, t
 
     response = client.post(
         f"/api/v1/nodes/{node.id}/resources/upload/stream",
-        files={"file": ("sample.txt", b"FastAPI delegates to application.", "text/plain")},
+        files={
+            "file": ("sample.txt", b"FastAPI delegates to application.", "text/plain")
+        },
     )
 
     assert response.status_code == 200
@@ -379,9 +423,7 @@ def test_resource_upload_stream_persists_index_status(sample_project, session, t
     resource = session.exec(
         select(NodeResource).where(NodeResource.node_id == node.id)
     ).first()
-    status = client.get(
-        f"/api/v1/nodes/{node.id}/resources/{resource.id}/index-status"
-    )
+    status = client.get(f"/api/v1/nodes/{node.id}/resources/{resource.id}/index-status")
     assert status.status_code == 200
     assert status.json()["status"] == "completed"
     assert status.json()["source_id"] == "source-7"
@@ -417,27 +459,53 @@ def test_model_configuration_routes_never_echo_api_key(session, tmp_path):
 
     service = ModelConfigurationService(
         env_path=tmp_path / ".env",
-        runtime_apply=lambda _config: None,
-        requester=lambda *_args, **_kwargs: type("Response", (), {"status_code": 200})(),
+        profiles_path=tmp_path / "profiles.json",
+        runtime_apply=lambda *_args: None,
+        requester=lambda *_args, **_kwargs: type(
+            "Response", (), {"status_code": 200}
+        )(),
     )
     app = create_app()
     app.dependency_overrides[get_session] = lambda: session
     app.dependency_overrides[get_model_configuration_service] = lambda: service
     client = TestClient(app)
-    payload = {
+    llm_payload = {
+        "name": "测试 LLM",
         "base_url": "https://example.test/v1",
         "api_key": "secret-key",
-        "chat_model": "chat-test",
-        "embedding_model": "embed-test",
+        "model": "chat-test",
+    }
+    rag_payload = {
+        "name": "测试 RAG",
+        "base_url": "https://embed.example/v1",
+        "api_key": "embed-secret",
+        "model": "embed-test",
     }
 
     initial = client.get("/api/v1/model-configuration")
-    saved = client.put("/api/v1/model-configuration", json=payload)
-    tested = client.post("/api/v1/model-configuration/test", json=payload)
+    llm_id = initial.json()["llm"]["active_profile_id"]
+    rag_id = initial.json()["rag"]["active_profile_id"]
+    saved = client.put(
+        f"/api/v1/model-configuration/llm/profiles/{llm_id}", json=llm_payload
+    )
+    rag_saved = client.put(
+        f"/api/v1/model-configuration/rag/profiles/{rag_id}", json=rag_payload
+    )
+    tested = client.post(
+        f"/api/v1/model-configuration/llm/test?profile_id={llm_id}",
+        json={**llm_payload, "api_key": ""},
+    )
+    rag_tested = client.post(
+        f"/api/v1/model-configuration/rag/test?profile_id={rag_id}",
+        json={**rag_payload, "api_key": ""},
+    )
 
     assert initial.status_code == 200
     assert saved.status_code == 200
-    assert saved.json()["api_key_configured"] is True
+    assert saved.json()["llm"]["api_key_configured"] is True
+    assert rag_saved.json()["rag"]["api_key_configured"] is True
     assert "secret-key" not in saved.text
-    assert "api_key" not in saved.json()
+    assert "embed-secret" not in rag_saved.text
+    assert "api_key" not in saved.json()["llm"]
     assert tested.json() == {"ok": True, "message": "对话模型连接成功"}
+    assert rag_tested.json() == {"ok": True, "message": "RAG 向量模型连接成功"}

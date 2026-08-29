@@ -82,10 +82,12 @@ from learning_ext.application.resources import (
 )
 from learning_ext.application.configuration import (
     ModelConfigurationError,
-    ModelConfigurationInput,
     ModelConfigurationService,
     ModelConfigurationStatus,
     ModelConnectivity,
+    ModelEndpointInput,
+    ModelEndpointStatus,
+    ModelProfileSummary,
 )
 
 __all__ = [
@@ -123,10 +125,12 @@ __all__ = [
     "ResourceDeletionResult",
     "NodeResourceSummary",
     "ModelConfigurationError",
-    "ModelConfigurationInput",
     "ModelConfigurationService",
     "ModelConfigurationStatus",
     "ModelConnectivity",
+    "ModelEndpointInput",
+    "ModelEndpointStatus",
+    "ModelProfileSummary",
     "WorkspaceNode",
     "create_project",
     "delete_node_resource",

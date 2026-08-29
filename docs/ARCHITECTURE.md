@@ -153,8 +153,64 @@ learn-everything/
 └── docs/ARCHITECTURE.md      # 本文档
 ```
 
-## 5. 历史桌面运行机制（兼容路径）
+## 5. 运行架构
 
+### 5.1 当前双前端共用业务核心
+
+```
+┌──────────────────────────────────── 表现层：两套前端 ────────────────────────────────────┐
+│                                                                                           │
+│  Next.js / React 默认前端                           Gradio 兼容回退前端                  │
+│  frontend/                                         custom_app.py                          │
+│  浏览器开发 :3000；构建后可由 PyWebView 承载        LE_UI=gradio 时运行 :7860              │
+└────────────────────────────┬───────────────────────────────────┬──────────────────────────┘
+                             │                                   │
+                             │ HTTP REST / SSE                   │ Gradio 组件事件回调
+                             ▼                                   ▼
+┌────────────────────────────────────┐      ┌────────────────────────────────────────────┐
+│ FastAPI HTTP 接入适配层             │      │ Gradio 页面接入适配层                       │
+│                                    │      │                                            │
+│ api/main.py                         │      │ custom_app.py                               │
+│ - 创建 FastAPI 应用                 │      │ - 创建 LearningApp                          │
+│ - 注册 /api/v1 路由                 │      │                                            │
+│ - 开发态 CORS、生产态静态托管        │      │ learning_ext/app.py                         │
+│                                    │      │ - LearningApp(KotaemonApp)                  │
+│ api/routers/*.py                    │      │ - init_learning_ext()                       │
+│ - HTTP 请求 / 响应编排              │      │ - _build_learning_tabs() 注册学习 Tab       │
+│                                    │      │                                            │
+│ api/schemas/*.py                    │      │ learning_ext/pages/*.py                     │
+│ - 请求 DTO、响应 DTO                │      │ - PathGeneratorPage / ReviewPage 等         │
+│                                    │      │ - 绑定 Gradio UI 与事件回调                 │
+│ api/dependencies.py                 │      │                                            │
+│ - Session、RAG Gateway 等依赖注入   │      │ 页面回调直接调用应用服务                     │
+└─────────────────────┬──────────────┘      └─────────────────────┬──────────────────────┘
+                      │                                           │
+                      │ DTO -> 应用服务调用                       │ 直接应用服务调用
+                      └───────────────────────┬───────────────────┘
+                                              ▼
+┌──────────────────────────── 共享业务核心：learning_ext/ ────────────────────────────────┐
+│                                                                                            │
+│ learning_ext/bootstrap.py                                                                  │
+│ - 两条启动路径均调用 init_learning_ext()，完成学习扩展初始化                               │
+│                                                                                            │
+│ learning_ext/application/*.py                                                              │
+│ - projects / roadmap / study / review / quiz / dashboard / resources / chat / jobs        │
+│ - 统一编排学习业务用例；service 函数以 session: Session 作为首个参数                       │
+│                                                                                            │
+│ learning_ext/ 领域模型、FSRS、LLM facade、Kotaemon RAG Adapter                            │
+└──────────────────────────────────────────────┬────────────────────────────────────────────┘
+                                               ▼
+┌──────────────────────────── Kotaemon 共享基础设施 ───────────────────────────────────────┐
+│ SQLite / SQLModel（le_* 表） · LLM 配置与调用 · 文档索引与 RAG · 外部 LLM Provider          │
+└────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+两套前端共用的是 `learning_ext/` 业务核心及 Kotaemon 基础设施，接入方式不同：Next.js 通过
+`frontend/lib/api.ts` 调用 FastAPI 的 `/api/v1` 契约；Gradio 由 `LearningApp` 装配
+`learning_ext/pages/`，页面事件回调直接调用同一批 `learning_ext/application/` 应用服务。
+
+### 5.2 历史桌面运行机制（兼容路径）
+目前新前端还没有做 Desktop 兼容
 ```
 用户双击                    PyWebView              Gradio 后端
 LearnEverything.exe  ──>   launcher.py 主进程  ──>  custom_app.py 子进程

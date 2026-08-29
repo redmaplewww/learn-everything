@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from pathlib import Path
+import sys
+from types import ModuleType
 
 from learning_ext.adapters.kotaemon_rag import (
     ChatMessage,
@@ -22,7 +24,9 @@ class FakeRagGateway:
 
     def index_documents(self, request):
         yield IndexingEvent(kind="progress", path=request.paths[0], message="开始索引")
-        yield IndexingEvent(kind="completed", path=request.paths[0], source_id="source-1")
+        yield IndexingEvent(
+            kind="completed", path=request.paths[0], source_id="source-1"
+        )
 
     def retrieve(self, request):
         return [
@@ -141,7 +145,11 @@ def test_adapter_converts_kotaemon_documents_and_stream_events(monkeypatch):
 
 def test_adapter_turns_pipeline_errors_into_error_event(monkeypatch):
     adapter = KotaemonRagAdapter()
-    monkeypatch.setattr(adapter, "_get_retrievers", lambda *args: (_ for _ in ()).throw(ValueError("索引不可用")))
+    monkeypatch.setattr(
+        adapter,
+        "_get_retrievers",
+        lambda *args: (_ for _ in ()).throw(ValueError("索引不可用")),
+    )
     request = RagAnswerRequest("1", "conversation-1", "问题", (), ("source-1",))
 
     events = list(adapter.stream_answer(request))
@@ -167,3 +175,38 @@ def test_adapter_deletes_only_explicit_sources_with_base_index_pipeline(monkeypa
     adapter.delete_documents("collection-1", ("source-a", "source-b"))
 
     assert deleted == [(pipeline, "source-a"), (pipeline, "source-b")]
+
+
+def test_adapter_uses_active_rag_embedding_for_new_collections(monkeypatch):
+    captured = {}
+
+    class FakeEmbeddingManager:
+        def get_default_name(self):
+            return "learning-rag"
+
+    class FakeIndex:
+        id = 12
+
+        def on_start(self):
+            captured["started"] = True
+
+    class FakeIndexManager:
+        def __init__(self, app):
+            captured["app"] = app
+
+        def build_index(self, **kwargs):
+            captured.update(kwargs)
+            return FakeIndex()
+
+    embeddings_module = ModuleType("ktem.embeddings.manager")
+    embeddings_module.embedding_models_manager = FakeEmbeddingManager()
+    index_module = ModuleType("ktem.index.manager")
+    index_module.IndexManager = FakeIndexManager
+    monkeypatch.setitem(sys.modules, "ktem.embeddings.manager", embeddings_module)
+    monkeypatch.setitem(sys.modules, "ktem.index.manager", index_module)
+
+    collection = KotaemonRagAdapter(app="application").create_collection("资料库")
+
+    assert collection == RagCollection(id="12", name="资料库")
+    assert captured["config"]["embedding"] == "learning-rag"
+    assert captured["started"] is True

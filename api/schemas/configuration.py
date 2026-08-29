@@ -1,22 +1,41 @@
-"""必要模型配置 HTTP Schema。"""
+"""模型配置 HTTP Schema。"""
 
 from pydantic import BaseModel, Field
 
 
-class ModelConfigurationResponse(BaseModel):
+class ModelEndpointResponse(BaseModel):
+    active_profile_id: str | None
+    active_profile_name: str | None
     base_url: str
-    chat_model: str
-    embedding_model: str
+    model: str
     api_key_configured: bool
-    chat_ready: bool
-    rag_ready: bool
+    ready: bool
 
 
-class ModelConfigurationWriteRequest(BaseModel):
+class ModelProfileResponse(BaseModel):
+    id: str
+    name: str
+    base_url: str
+    model: str
+    api_key_configured: bool
+
+
+class ModelConfigurationResponse(BaseModel):
+    llm: ModelEndpointResponse
+    rag: ModelEndpointResponse
+    llm_profiles: list[ModelProfileResponse]
+    rag_profiles: list[ModelProfileResponse]
+
+
+class ModelEndpointWriteRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
     base_url: str = Field(min_length=1, max_length=500)
-    api_key: str = Field(min_length=1, max_length=2000)
-    chat_model: str = Field(min_length=1, max_length=200)
-    embedding_model: str = Field(default="", max_length=200)
+    api_key: str = Field(default="", max_length=2000)
+    model: str = Field(min_length=1, max_length=200)
+
+
+class ModelProfileCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
 
 
 class ModelConnectivityResponse(BaseModel):

@@ -128,8 +128,10 @@ export type QuizAnswer = { attempt_id: number; question_id: number; node_id: num
 export type Dashboard = { project_id: number | null; projects: Array<{ label: string; id: number }>; metrics: { total_nodes: number; mastered_nodes: number; avg_mastery: number; week_minutes: number; due_cards: number; total_cards: number }; status_counts: Record<string, number>; heatmap: Array<{ date: string; minutes: number }>; latest_report: string };
 export type RagExcerpt = { source_id: string; text: string; score: number | null; metadata: Record<string, unknown> };
 export type RagStreamEvent = { kind: "evidence" | "answer_delta" | "citation" | "complete" | "error"; text: string | null; excerpts: RagExcerpt[]; metadata: Record<string, unknown> };
-export type ModelConfiguration = { base_url: string; chat_model: string; embedding_model: string; api_key_configured: boolean; chat_ready: boolean; rag_ready: boolean };
-export type ModelConfigurationInput = { base_url: string; api_key: string; chat_model: string; embedding_model: string };
+export type ModelEndpoint = { active_profile_id: string | null; active_profile_name: string | null; base_url: string; model: string; api_key_configured: boolean; ready: boolean };
+export type ModelProfile = { id: string; name: string; base_url: string; model: string; api_key_configured: boolean };
+export type ModelConfiguration = { llm: ModelEndpoint; rag: ModelEndpoint; llm_profiles: ModelProfile[]; rag_profiles: ModelProfile[] };
+export type ModelEndpointInput = { name: string; base_url: string; api_key: string; model: string };
 export type ModelConnectivity = { ok: boolean; message: string };
 export type IndexedResource = { resource_id: number; node_id: number; title: string; rtype: string; source: string; status: string; message: string | null; collection_id: string | null; source_id: string | null };
 export type ResourceDeletionPreview = { resource: IndexedResource; confirmation_phrase: string; index_delete_required: boolean };
@@ -208,8 +210,11 @@ export const generateQuiz = (projectId: number, payload: { node_ids: number[]; c
 export const submitQuizAnswer = (projectId: number, questionId: number, answer: string) => request<QuizAnswer>(`/projects/${projectId}/quizzes/questions/${questionId}/answer`, { method: "POST", body: JSON.stringify({ answer }) });
 export const getDashboard = (projectId: number) => request<Dashboard>(`/projects/${projectId}/dashboard`);
 export const getModelConfiguration = () => request<ModelConfiguration>("/model-configuration");
-export const saveModelConfiguration = (payload: ModelConfigurationInput) => request<ModelConfiguration>("/model-configuration", { method: "PUT", body: JSON.stringify(payload) });
-export const testModelConfiguration = (payload: ModelConfigurationInput) => request<ModelConnectivity>("/model-configuration/test", { method: "POST", body: JSON.stringify(payload) });
+export const createModelProfile = (kind: "llm" | "rag", name: string) => request<ModelConfiguration>(`/model-configuration/${kind}/profiles`, { method: "POST", body: JSON.stringify({ name }) });
+export const saveModelProfile = (kind: "llm" | "rag", profileId: string, payload: ModelEndpointInput) => request<ModelConfiguration>(`/model-configuration/${kind}/profiles/${profileId}`, { method: "PUT", body: JSON.stringify(payload) });
+export const activateModelProfile = (kind: "llm" | "rag", profileId: string) => request<ModelConfiguration>(`/model-configuration/${kind}/profiles/${profileId}/activate`, { method: "POST" });
+export const deleteModelProfile = (kind: "llm" | "rag", profileId: string) => request<ModelConfiguration>(`/model-configuration/${kind}/profiles/${profileId}`, { method: "DELETE" });
+export const testModelProfile = (kind: "llm" | "rag", payload: ModelEndpointInput, profileId?: string) => request<ModelConnectivity>(`/model-configuration/${kind}/test${profileId ? `?profile_id=${encodeURIComponent(profileId)}` : ""}`, { method: "POST", body: JSON.stringify(payload) });
 export const listNodeResources = (nodeId: number) => request<IndexedResource[]>(`/nodes/${nodeId}/resources`);
 export const getResourceDeletionPreview = (nodeId: number, resourceId: number) => request<ResourceDeletionPreview>(`/nodes/${nodeId}/resources/${resourceId}/deletion-preview`);
 export const deleteNodeResource = (nodeId: number, resourceId: number, confirmation_phrase: string) => request<{ resource_id: number; index_deleted: boolean }>(`/nodes/${nodeId}/resources/${resourceId}`, { method: "DELETE", body: JSON.stringify({ confirmation_phrase }) });

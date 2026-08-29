@@ -45,7 +45,9 @@ def _ensure_sqlite_columns(engine) -> None:
             existing = {column["name"] for column in inspector.get_columns(table)}
             for column, ddl in columns.items():
                 if column not in existing:
-                    conn.execute(text(f'ALTER TABLE "{table}" ADD COLUMN "{column}" {ddl}'))
+                    conn.execute(
+                        text(f'ALTER TABLE "{table}" ADD COLUMN "{column}" {ddl}')
+                    )
                     logger.info("[learning_ext] 已补齐 %s.%s", table, column)
 
 
@@ -74,6 +76,14 @@ def init_learning_ext() -> None:
         logger.warning(
             "[learning_ext] fsrs 库未安装，复习功能不可用。请在容器内: uv pip install fsrs"
         )
+
+    try:
+        from learning_ext.application.configuration import ModelConfigurationService
+
+        ModelConfigurationService().apply_active_profiles()
+        logger.info("[learning_ext] 已应用活动 LLM 与 RAG 模型档案")
+    except Exception as error:
+        logger.warning("[learning_ext] 活动模型档案未应用: %s", error)
 
     _initialized = True
     logger.info("[learning_ext] 初始化完成")
