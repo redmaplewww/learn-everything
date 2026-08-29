@@ -126,8 +126,9 @@ h1 { margin-bottom: 0; font-size: 30px; line-height: 1.1; }
 .quiz-panel { display: grid; gap: 14px; margin-top: 30px; padding-top: 24px; border-top: 2px solid var(--ink); }
 .quiz-form { display: grid; grid-template-columns: minmax(220px, 1fr) 130px 130px auto; gap: 10px; align-items: end; }
 .quiz-form label { display: grid; gap: 6px; color: var(--muted); font-size: 12px; font-weight: 800; }
-.quiz-form select, .quiz-form input, .quiz-question textarea { width: 100%; padding: 9px; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 3px; font: inherit; }
-.quiz-form select[multiple] { min-height: 92px; }
+.quiz-form select, .quiz-form input, .quiz-question textarea { width: 100%; min-width: 0; padding: 9px; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 3px; font: inherit; }
+.quiz-form select { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quiz-selection-detail { grid-column: 1 / -1; margin: -2px 0 0; color: var(--forest); font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
 .quiz-question { display: grid; gap: 12px; padding: 20px; background: #fff; border: 1px solid var(--line); border-left: 4px solid var(--amber); }
 .quiz-question > span { color: var(--muted); font-size: 12px; font-weight: 800; }
 .quiz-question > strong { font-family: "Noto Serif SC", Georgia, serif; font-size: 20px; line-height: 1.5; }
@@ -171,7 +172,7 @@ h1 { margin-bottom: 0; font-size: 30px; line-height: 1.1; }
 .dashboard-metrics strong { font-family: "Noto Serif SC", Georgia, serif; font-size: 24px; }.dashboard-metrics span { color: var(--muted); font-size: 12px; }
 .dashboard-detail { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }.dashboard-detail > div { padding: 14px; background: #fff; border: 1px solid var(--line); }.dashboard-detail p { display: flex; justify-content: space-between; margin: 8px 0; color: var(--muted); }.dashboard-detail b { color: var(--ink); }
 .heatmap { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 4px; margin-top: 12px; }.heatmap span { display: grid; min-height: 42px; place-items: center; color: #fff; background: var(--forest); font-size: 10px; }
-.dashboard-report { white-space: pre-wrap; padding: 14px; background: #fff; border-left: 4px solid var(--amber); line-height: 1.6; }.export-actions { display: flex; flex-wrap: wrap; gap: 8px; }.export-actions button { padding: 9px 11px; color: var(--forest); background: #fff; border: 1px solid var(--forest); border-radius: 3px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 800; }.export-actions button:hover { color: #fff; background: var(--forest); }
+.dashboard-report { white-space: pre-wrap; padding: 14px; background: #fff; border-left: 4px solid var(--amber); line-height: 1.6; }.export-actions { display: flex; flex-wrap: wrap; gap: 8px; }.export-actions button { padding: 9px 11px; color: var(--forest); background: #fff; border: 1px solid var(--forest); border-radius: 3px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 800; }.export-actions button:hover { color: #fff; background: var(--forest); }.export-hint { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
 .status-control { display: flex; flex-wrap: wrap; justify-content: end; gap: 4px; max-width: 220px; }
 .status-button { padding: 7px 8px; color: var(--muted); background: #f4f7f5; border: 1px solid var(--line); border-radius: 3px; cursor: pointer; font-size: 12px; font-weight: 700; transition: 150ms ease; }
 .status-button:hover:not(:disabled), .status-button.active { color: #fff; background: var(--forest); border-color: var(--forest); }

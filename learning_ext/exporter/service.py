@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import html
 import zipfile
 from datetime import datetime, timezone
 from typing import Optional
@@ -120,12 +121,17 @@ def export_progress_report(session: Session, project_id: int) -> str:
     nodes = sort_nodes_by_code(list(nodes))
     overview = get_project_overview(session, project_id)
 
-    html = f"""<!DOCTYPE html>
+    def _escape_html(value: object) -> str:
+        return html.escape("" if value is None else str(value), quote=True)
+
+    esc = _escape_html
+    report_html = f"""<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8">
-<title>学习报告 - {project.title}</title>
+<title>学习报告 - {esc(project.title)}</title>
 <style>
 body {{ font-family: -apple-system, "Microsoft YaHei", sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; color: #333; }}
 h1 {{ border-bottom: 3px solid #4F46E5; padding-bottom: 10px; }}
+.print-note {{ padding: 10px 12px; background: #EEF2FF; border-left: 4px solid #4F46E5; }}
 .metric {{ display: inline-block; background: #F3F4F6; padding: 12px 20px; margin: 5px; border-radius: 8px; }}
 .metric .val {{ font-size: 24px; font-weight: bold; color: #4F46E5; }}
 .node {{ margin: 12px 0; padding: 12px; border-left: 4px solid #ddd; background: #fafafa; }}
@@ -133,10 +139,12 @@ h1 {{ border-bottom: 3px solid #4F46E5; padding-bottom: 10px; }}
 .node.weak {{ border-color: #EF4444; }}
 .bar {{ height: 8px; background: #E5E7EB; border-radius: 4px; margin-top: 4px; }}
 .bar > div {{ height: 100%; background: #4F46E5; border-radius: 4px; }}
+@media print {{ body {{ margin: 0; max-width: none; }} .print-note {{ display: none; }} }}
 </style></head><body>
 <h1>📊 学习进度报告</h1>
-<p><strong>{project.title}</strong></p>
-<p>选题：{project.topic}</p>
+<p class="print-note">这是 HTML 学习报告。请使用浏览器的“打印”功能，并选择“另存为 PDF”保存。</p>
+<p><strong>{esc(project.title)}</strong></p>
+<p>选题：{esc(project.topic)}</p>
 
 <div>
   <div class="metric"><div class="val">{overview["total"]}</div>知识点</div>
@@ -148,13 +156,13 @@ h1 {{ border-bottom: 3px solid #4F46E5; padding-bottom: 10px; }}
 <h2>知识点掌握详情</h2>
 """
     for n in nodes:
-        html += f"""<div class="node {n.status}">
-  <strong>[{n.code}] {n.title}</strong>
-  <span style="float:right;color:#888">{n.status}</span>
+        report_html += f"""<div class="node {esc(n.status)}">
+  <strong>[{esc(n.code)}] {esc(n.title)}</strong>
+  <span style="float:right;color:#888">{esc(n.status)}</span>
   <div class="bar"><div style="width:{n.mastery * 100:.0f}%"></div></div>
   <small>掌握度 {n.mastery:.0%} | 难度 {n.difficulty}/5 | {n.est_hours}h</small>
 </div>
 """
-    html += f"\n<p style='text-align:center;color:#999;margin-top:40px;'>生成于 {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')} | 学习 Agent</p>\n"
-    html += "</body></html>"
-    return html
+    report_html += f"\n<p style='text-align:center;color:#999;margin-top:40px;'>生成于 {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M')} | 学习 Agent</p>\n"
+    report_html += "</body></html>"
+    return report_html

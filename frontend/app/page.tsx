@@ -198,7 +198,7 @@ function ReviewPanel({ projectId }: { projectId: number }) {
 }
 
 function QuizPanel({ projectId, nodes }: { projectId: number; nodes: WorkspaceNode[] }) {
-  const [selectedNodeIds, setSelectedNodeIds] = useState<number[]>([]);
+  const [selectedNodeId, setSelectedNodeId] = useState("");
   const [count, setCount] = useState(3);
   const [qtype, setQtype] = useState("mixed");
   const [quiz, setQuiz] = useState<QuizGeneration | null>(null);
@@ -207,12 +207,14 @@ function QuizPanel({ projectId, nodes }: { projectId: number; nodes: WorkspaceNo
   const [feedback, setFeedback] = useState<QuizAnswer | null>(null);
   const [state, setState] = useState<LoadState>("idle");
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => { setSelectedNodeIds(nodes.map((node) => node.id)); setQuiz(null); setIndex(0); setFeedback(null); }, [projectId, nodes]);
+  const nodeSelectionKey = nodes.map((node) => node.id).join(",");
+  const selectedNode = nodes.find((node) => String(node.id) === selectedNodeId) ?? null;
+  useEffect(() => { setSelectedNodeId(""); setQuiz(null); setIndex(0); setFeedback(null); }, [projectId, nodeSelectionKey]);
   const question = quiz?.questions[index] ?? null;
   const generate = async () => {
-    if (!selectedNodeIds.length) { setError("请至少选择一个知识点"); return; }
+    if (!selectedNodeId) { setError("请选择一个知识点"); return; }
     setState("loading"); setError(null);
-    try { const next = await generateQuiz(projectId, { node_ids: selectedNodeIds, count, qtype }); setQuiz(next); setIndex(0); setAnswer(""); setFeedback(null); setState("ready"); }
+    try { const next = await generateQuiz(projectId, { node_ids: [Number(selectedNodeId)], count, qtype }); setQuiz(next); setIndex(0); setAnswer(""); setFeedback(null); setState("ready"); }
     catch (generationError) { setError(formatError(generationError)); setState("error"); }
   };
   const submit = async () => {
@@ -224,7 +226,18 @@ function QuizPanel({ projectId, nodes }: { projectId: number; nodes: WorkspaceNo
   const next = () => { setIndex((value) => value + 1); setAnswer(""); setFeedback(null); setError(null); };
   return <section className="quiz-panel">
     <div className="section-heading"><div><p className="eyebrow">KNOWLEDGE CHECK</p><h3>查漏测验</h3></div></div>
-    <div className="quiz-form"><label>知识点<select multiple value={selectedNodeIds.map(String)} onChange={(event) => setSelectedNodeIds([...event.currentTarget.selectedOptions].map((item) => Number(item.value)))}>{nodes.map((node) => <option value={node.id} key={node.id}>{node.code} {node.title}</option>)}</select></label><label>题目数量<input type="number" min="1" max="20" value={count} onChange={(event) => setCount(Number(event.target.value))} /></label><label>题型<select value={qtype} onChange={(event) => setQtype(event.target.value)}><option value="mixed">混合</option><option value="choice">选择</option><option value="fill">填空</option><option value="short">简答</option><option value="practice">实操</option></select></label><button type="button" className="command-button" onClick={() => void generate()} disabled={state === "loading"}>生成测验</button></div>
+    <div className="quiz-form">
+      <label>知识点
+        <select value={selectedNodeId} onChange={(event) => setSelectedNodeId(event.target.value)} disabled={!nodes.length || state === "loading"}>
+          <option value="">{nodes.length ? "请选择知识点" : "当前项目没有知识点"}</option>
+          {nodes.map((node) => <option value={node.id} key={node.id} title={`${node.code} ${node.title}`}>{node.code} {node.title}</option>)}
+        </select>
+      </label>
+      {selectedNode && <p className="quiz-selection-detail" title={selectedNode.title}>已选：{selectedNode.code} {selectedNode.title}</p>}
+      <label>题目数量<input type="number" min="1" max="20" value={count} onChange={(event) => setCount(Number(event.target.value))} /></label>
+      <label>题型<select value={qtype} onChange={(event) => setQtype(event.target.value)}><option value="mixed">混合</option><option value="choice">选择</option><option value="fill">填空</option><option value="short">简答</option><option value="practice">实操</option></select></label>
+      <button type="button" className="command-button" onClick={() => void generate()} disabled={!nodes.length || state === "loading"}>生成测验</button>
+    </div>
     {state === "loading" && <div className="review-state"><LoaderCircle className="spin" size={18} />正在处理测验</div>}
     {error && <div className="review-state detail-error"><AlertCircle size={18} />{error}</div>}
     {question && state !== "loading" && <div className="quiz-question"><span>第 {index + 1} / {quiz?.questions.length} 题 · {question.qtype}</span><strong>{question.stem}</strong>{question.options.map((option) => <button type="button" className={`quiz-option ${answer === option ? "active" : ""}`} key={option} onClick={() => setAnswer(option)}>{option}</button>)}<textarea value={answer} onChange={(event) => setAnswer(event.target.value)} placeholder="输入你的答案" /><button type="button" className="command-button" onClick={() => void submit()} disabled={Boolean(feedback)}>提交答案</button>{feedback && <div className={feedback.is_correct ? "quiz-feedback correct" : "quiz-feedback incorrect"}><strong>{feedback.is_correct ? "回答正确" : "需要巩固"}</strong><p>{feedback.feedback}</p>{feedback.mastery !== null && <span>当前掌握度 {Math.round(feedback.mastery * 100)}%</span>}{index + 1 < (quiz?.questions.length ?? 0) && <button type="button" className="secondary-button" onClick={next}>下一题</button>}</div>}</div>}
@@ -240,7 +253,7 @@ function DashboardPanel({ projectId }: { projectId: number }) {
   const download = (kind: string) => { window.location.assign(apiUrl(`/projects/${projectId}/exports/${kind}`)); };
   return <section className="dashboard-panel"><div className="section-heading"><div><p className="eyebrow">LEARNING DASHBOARD</p><h3>学习概览</h3></div><button type="button" className="text-action" onClick={() => void load()}>刷新</button></div>
     {state === "loading" && <div className="review-state"><LoaderCircle className="spin" size={18} />正在读取看板</div>}{state === "error" && <div className="review-state detail-error"><AlertCircle size={18} />{error}<button type="button" className="text-action" onClick={() => void load()}>重试</button></div>}
-    {dashboard && state === "ready" && <><div className="dashboard-metrics"><div><strong>{dashboard.metrics.total_nodes}</strong><span>知识点</span></div><div><strong>{dashboard.metrics.mastered_nodes}</strong><span>已掌握</span></div><div><strong>{Math.round(dashboard.metrics.avg_mastery * 100)}%</strong><span>平均掌握</span></div><div><strong>{dashboard.metrics.week_minutes}</strong><span>近 7 天分钟</span></div><div><strong>{dashboard.metrics.due_cards}/{dashboard.metrics.total_cards}</strong><span>到期卡片</span></div></div><div className="dashboard-detail"><div><strong>状态分布</strong>{Object.entries(dashboard.status_counts).map(([key, value]) => <p key={key}>{statusLabels[key] ?? key} <b>{value}</b></p>)}</div><div><strong>近 14 天学习热力</strong><div className="heatmap">{dashboard.heatmap.map((day) => <span title={`${day.date}: ${day.minutes} 分钟`} style={{ opacity: day.minutes ? Math.min(1, 0.25 + day.minutes / 60) : 0.1 }} key={day.date}>{day.minutes}</span>)}</div></div></div><article className="dashboard-report">{dashboard.latest_report}</article><div className="export-actions"><button type="button" onClick={() => download("roadmap")}>路线 JSON</button><button type="button" onClick={() => download("markdown")}>学习笔记</button><button type="button" onClick={() => download("report")}>进度报告</button><button type="button" onClick={() => download("anki")}>Anki ZIP</button></div></>}
+    {dashboard && state === "ready" && <><div className="dashboard-metrics"><div><strong>{dashboard.metrics.total_nodes}</strong><span>知识点</span></div><div><strong>{dashboard.metrics.mastered_nodes}</strong><span>已掌握</span></div><div><strong>{Math.round(dashboard.metrics.avg_mastery * 100)}%</strong><span>平均掌握</span></div><div><strong>{dashboard.metrics.week_minutes}</strong><span>近 7 天分钟</span></div><div><strong>{dashboard.metrics.due_cards}/{dashboard.metrics.total_cards}</strong><span>到期卡片</span></div></div><div className="dashboard-detail"><div><strong>状态分布</strong>{Object.entries(dashboard.status_counts).map(([key, value]) => <p key={key}>{statusLabels[key] ?? key} <b>{value}</b></p>)}</div><div><strong>近 14 天学习热力</strong><div className="heatmap">{dashboard.heatmap.map((day) => <span title={`${day.date}: ${day.minutes} 分钟`} style={{ opacity: day.minutes ? Math.min(1, 0.25 + day.minutes / 60) : 0.1 }} key={day.date}>{day.minutes}</span>)}</div></div></div><article className="dashboard-report">{dashboard.latest_report}</article><div className="export-actions"><button type="button" onClick={() => download("roadmap")}>路线 JSON</button><button type="button" onClick={() => download("markdown")}>学习笔记</button><button type="button" onClick={() => download("report")}>进度报告 HTML</button><button type="button" onClick={() => download("anki")}>Anki ZIP</button></div><p className="export-hint">进度报告为 HTML 文件，下载后可使用浏览器打印功能保存为 PDF。</p></>}
   </section>;
 }
 

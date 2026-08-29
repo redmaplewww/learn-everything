@@ -287,10 +287,20 @@ def test_dashboard_and_export_routes_return_application_results(sample_project, 
     assert dashboard.status_code == 200
     assert dashboard.json()["metrics"]["total_nodes"] > 0
 
-    exported = client.get(f"/api/v1/projects/{sample_project.id}/exports/roadmap")
-    assert exported.status_code == 200
-    assert exported.headers["content-disposition"].endswith('.json"')
-    assert exported.headers["content-type"].startswith("application/json")
+    expected_exports = {
+        "roadmap": (".json", "application/json"),
+        "markdown": (".md", "text/markdown"),
+        "report": (".html", "text/html"),
+        "anki": (".zip", "application/zip"),
+    }
+    for kind, (suffix, media_type) in expected_exports.items():
+        exported = client.get(f"/api/v1/projects/{sample_project.id}/exports/{kind}")
+        assert exported.status_code == 200
+        assert exported.headers["content-disposition"].endswith(f'{suffix}"')
+        assert exported.headers["content-type"].startswith(media_type)
+        assert exported.content
+        if kind == "report":
+            assert "另存为 PDF" in exported.text
 
 
 def test_rag_stream_route_encodes_application_events_as_sse(session):

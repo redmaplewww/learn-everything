@@ -380,6 +380,22 @@ def test_export_project_preserves_content_types_and_filenames(sample_project, se
         export_project(session, sample_project.id, "pdf")
 
 
+def test_progress_report_is_printable_html_and_escapes_project_text(sample_project, session):
+    sample_project.title = "Rust <核心> & 练习"
+    sample_project.topic = '类型 "系统"'
+    session.add(sample_project)
+    session.commit()
+
+    exported = export_project(session, sample_project.id, "report")
+    content = exported.content.decode("utf-8")
+
+    assert 'class="print-note"' in content
+    assert "另存为 PDF" in content
+    assert "Rust &lt;核心&gt; &amp; 练习" in content
+    assert '类型 &quot;系统&quot;' in content
+    assert "Rust <核心> & 练习</strong>" not in content
+
+
 def test_workspace_aggregates_nodes_without_generation(sample_project, session):
     node = session.exec(
         select(KnowledgeNode)
