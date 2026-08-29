@@ -44,6 +44,6 @@ if errorlevel 1 (
 echo.
 echo [3/3] 环境初始化完成！
 echo.
-echo 下一步: 双击 run.bat 启动程序
+echo 下一步: 双击 start.bat 启动程序
 echo.
 pause

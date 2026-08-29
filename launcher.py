@@ -7,7 +7,7 @@
     4. 主线程用 PyWebView 打开桌面窗口 (可选，环境无 pywebview 则退化为浏览器)
 
 使用：
-    直接双击运行，或被 run.bat / PyInstaller 打包的 exe 调用。
+    直接双击运行，或被便携版 start.bat / PyInstaller 打包的 exe 调用。
 """
 
 from __future__ import annotations

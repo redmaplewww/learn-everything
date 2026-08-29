@@ -1,6 +1,6 @@
 # 学习 Agent (Learn Everything)
 
-> 给任意选题，AI 制定学习路线 + 辅助搭建系统环境 + 给出实操；带知识库、文献管理、学习进度跟踪、艾宾浩斯记忆曲线复习、查漏补缺测验。**Windows 桌面应用，双击 exe 即用。**
+> 给任意选题，AI 制定学习路线 + 辅助搭建系统环境 + 给出实操；带知识库、文献管理、学习进度跟踪、艾宾浩斯记忆曲线复习、查漏补缺测验。当前日常开发和使用入口是本机浏览器应用。
 
 基于开源 [Kotaemon](https://github.com/Cinnamon/kotaemon) (RAG 底座) + FSRS v6 (记忆算法) + 自建学习特化模块。
 
@@ -9,20 +9,23 @@
 ### 首次使用（开发者/高级用户）
 1. **初始化环境**（需联网，约 5-15 分钟）：双击 `setup.bat`
 2. **配置 LLM**：编辑 `kotaemon\.env`，填入任一 API key（DeepSeek 推荐）
-3. **启动**：双击 `run.bat`，或开发模式 `python launcher.py`
+3. **启动**：双击 `start.bat`
 
-### Next.js 开发模式
-迁移中的浏览器前端使用 Next.js + FastAPI。先执行 `setup.bat`，再在仓库根目录运行：
+### 浏览器开发模式
+
+浏览器前端使用 Next.js + FastAPI。源码目录中的 `start.bat` 会执行下列命令：
 
 ```powershell
 kotaemon\.venv\Scripts\python.exe scripts\start_frontend_dev.py
 ```
 
-脚本会启动 FastAPI `http://127.0.0.1:8000` 和 Next.js `http://127.0.0.1:3000`。开发态前端通过本机 CORS 直连 API；构建后的静态页面由 FastAPI 在 `http://127.0.0.1:8000/` 同源提供。日志写入 `logs/frontend-dev-api.log` 与 `logs/frontend-dev-next.log`；按 `Ctrl+C` 会回收两个子进程。端口已被占用时脚本会拒绝启动并提示对应端口。
+脚本会启动 Next.js 前端 `http://127.0.0.1:3000` 和 FastAPI API `http://127.0.0.1:8000`。开发时应始终访问 `http://127.0.0.1:3000`；8000 只提供 `/api/v1/*` 接口，不提供 UI。日志写入 `logs/frontend-dev-api.log` 与 `logs/frontend-dev-next.log`；按 `Ctrl+C` 会回收两个子进程。端口已被占用时脚本会拒绝启动并提示对应端口。
 
 浏览器开发服务默认使用 `kotaemon/ktem_app_data` 的正式 SQLite。需要用隔离数据进行开发或回归时，先设置 `LEARNING_DEV_DATA_DIR`，再运行启动命令；该变量会将服务切换到指定的数据目录，而不会改写正式 SQLite。
 
-当前 `run.bat` 和 exe 仍打开 Gradio，作为迁移期间的回退入口；桌面启动链将在后续阶段切换为同一套 Next.js 页面。
+### 静态页面与桌面打包
+
+执行 `frontend` 目录中的 `npm run build` 后，`launcher.py` 和打包 exe 会由 FastAPI 在 `http://127.0.0.1:8000/` 提供 `frontend/out` 的静态页面。该路径用于构建/打包验证，不是日常源码开发入口；桌面分发当前仍处于暂停演进状态。
 
 ### 打包成 exe 分发
 1. `build_exe.bat` — PyInstaller 打包 launcher 为 `LearnEverything.exe`
@@ -32,10 +35,11 @@ kotaemon\.venv\Scripts\python.exe scripts\start_frontend_dev.py
 
 | 文件 | 作用 |
 |---|---|
-| `launcher.py` | 桌面启动器：启动 FastAPI 静态前端 + PyWebView 桌面窗口，保留 Gradio 回退 |
+| `start.bat` | 推荐启动入口：同时启动 Next.js（3000）与 FastAPI（8000） |
+| `scripts/start_frontend_dev.py` | 本地开发服务编排与日志转发 |
+| `launcher.py` | 构建/桌面启动器：启动 FastAPI 静态前端 + PyWebView 窗口 |
 | `custom_app.py` | 后端入口：加载 LearningApp（Kotaemon + 学习 Tab） |
 | `setup.bat` | 首次环境初始化（装 uv + venv + 依赖） |
-| `run.bat` | 启动程序 |
 | `build_exe.bat` | 打包 launcher.exe |
 | `pack_portable.bat` | 组装可分发的完整便携版 |
 | `learning_ext/` | 学习特化代码（路线/复习/测验/看板等） |

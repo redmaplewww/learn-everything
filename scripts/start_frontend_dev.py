@@ -69,6 +69,7 @@ def _environment() -> dict[str, str]:
     env["TRANSFORMERS_OFFLINE"] = env.get("TRANSFORMERS_OFFLINE", "1")
     env["PYTHONUTF8"] = "1"
     env["PYTHONIOENCODING"] = "utf-8"
+    env["LEARNING_DEV_MODE"] = "1"
     for key in ("COHERE_API_KEY", "VOYAGE_API_KEY", "MISTRAL_API_KEY", "GOOGLE_API_KEY"):
         env.setdefault(key, "placeholder-key-1234567890")
     env["NEXT_PUBLIC_LEARNING_API_BASE"] = f"http://{HOST}:{API_PORT}/api/v1"

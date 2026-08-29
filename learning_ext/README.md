@@ -1,6 +1,6 @@
 # `learning_ext` 学习特化层
 
-`learning_ext` 是 Learn Everything 的学习领域代码，位于 Kotaemon RAG 底座之上。它负责学习路线、知识节点、掌握度、间隔复习、测验、学习笔记和学习看板等业务能力；Kotaemon 负责应用运行时、Gradio 基础设施、LLM 配置和资料库/RAG 能力。
+`learning_ext` 是 Learn Everything 的学习领域代码，位于 Kotaemon RAG 底座之上。它负责学习路线、知识节点、掌握度、间隔复习、测验、学习笔记和学习看板等业务能力；Kotaemon 负责运行时、LLM 配置和资料库/RAG 能力。当前主界面由 Next.js 提供，经 FastAPI 调用本目录的领域服务；保留的 Gradio 页面仅用于兼容旧入口。
 
 本目录的代码应当可以在未来被独立的 HTTP API 或 Next.js 前端复用。因此，页面负责 UI 编排，领域模块负责业务规则，数据模型负责持久化结构，LLM 调用统一经过 `learning_ext.llm`。
 
@@ -8,7 +8,8 @@
 
 | 想了解什么 | 建议阅读顺序 |
 | --- | --- |
-| 应用如何启动 | `custom_app.py` → `app.py` → `bootstrap.py` |
+| 浏览器应用如何启动 | `start.bat` → `scripts/start_frontend_dev.py` → `api/main.py` → `bootstrap.py` |
+| 旧 Gradio 入口如何启动 | `custom_app.py` → `app.py` → `bootstrap.py` |
 | 一个 Tab 如何接入 | `pages/path_generator.py` → `app.py._build_learning_tabs` |
 | 学习路线如何落库 | `path_generator/service.py` → `db/models.py` |
 | 掌握度如何变化 | `progress/service.py` → `progress/study.py` |
@@ -18,19 +19,15 @@
 ## 架构总览
 
 ```text
-用户操作
+浏览器（http://127.0.0.1:3000）
    │
    ▼
-custom_app.py
-   │ 创建 LearningApp
+frontend/ (Next.js)
    ▼
-app.py: LearningApp(KotaemonApp)
-   │ 注册 Gradio Tab / 页面事件
+api/main.py (FastAPI)
+   │ 调用 application / 领域服务
    ▼
-pages/                         # UI 适配层：BasePage 子类
-   │ 调用普通 Python 函数
-   ▼
-领域服务                         # 不依赖 Gradio 的业务逻辑
+领域服务                         # 不依赖 UI 的业务逻辑
 path_generator  progress  fsrs_review  quiz  notes  dashboard
 feynman         practice  exporter
    │                 │
@@ -44,11 +41,12 @@ ktem.db.engine.engine + kotaemon/.env 中的 LLM 配置
 
 ### 运行时边界
 
-- `custom_app.py` 是后端入口：准备 `sys.path`、离线模式和环境变量，然后创建 `LearningApp`。
-- `app.py` 是 Kotaemon 与学习功能之间的 UI 组合点。`LearningApp.__init__` 调用 `bootstrap.init_learning_ext()`，`_build_learning_tabs()` 注册学习页面。
+- `scripts/start_frontend_dev.py` 是日常开发入口：启动 Next.js（3000）与 FastAPI（8000），并设置 `LEARNING_DEV_MODE=1`，让 8000 只提供 API。
+- `api/main.py` 是浏览器应用的后端入口：注册 `/api/v1` 路由，在启动生命周期中调用 `bootstrap.init_learning_ext()`。
+- `custom_app.py` 与 `app.py` 仍保留 Gradio 兼容入口，不是当前主界面路径。
 - `bootstrap.py` 负责幂等初始化学习表、补齐本地 SQLite 的新增列，并检查 `fsrs` 是否可用。
 - 学习表复用 Kotaemon 的 SQLModel engine，表名统一使用 `le_` 前缀；运行数据位于 `kotaemon/ktem_app_data/`，不属于源码目录。
-- 领域服务可以依赖共享的数据库 engine 和 LLM facade，但不应把 Gradio 组件传入领域模块。
+- 领域服务可以依赖共享的数据库 engine 和 LLM facade，但不应把 Next.js、FastAPI 或 Gradio 组件传入领域模块。
 - `llm/client.py` 读取 `kotaemon/.env` 的 OpenAI 兼容配置并负责客户端、重试和 JSON 解析；它复用的是项目配置约定，不直接调用 Kotaemon 的 `llms manager`。
 
 ## 目录结构与职责
@@ -166,7 +164,7 @@ ReviewPage                  QuizPage
 
 ## 验证与演进
 
-- 启动验证从 `run.bat` 或项目约定的 Kotaemon 虚拟环境进入；首次启动会加载较多底座依赖。
-- 修改 `learning_ext` 或 `custom_app.py` 通常不需要重新打包 launcher；修改 `launcher.py` 才需要重新执行 `build_exe.bat`。
+- 日常启动验证使用 `start.bat`，访问 `http://127.0.0.1:3000`；8000 仅用于 API 调试。首次启动会加载较多底座依赖。
+- 修改 `learning_ext` 或 `api/` 后重启开发脚本即可生效；修改桌面打包路径的 `launcher.py` 后才需要重新执行 `build_exe.bat`。
 - 业务服务应优先做函数级测试，页面测试只覆盖事件编排和关键交互。完整测试入口可能受 Kotaemon 自带测试的导入环境影响，因此应区分学习模块测试与仓库全量测试。
-- 当前页面层仍是 Gradio 适配层；未来迁移到 Next.js 时，优先复用领域 service、模型语义和 LLM facade，逐步替换 `pages/` 与 `app.py`，而不是把 Gradio 组件直接暴露给 API。
+- 当前主页面层为 `frontend/`（Next.js），Gradio 适配层仍保留兼容用途。新功能优先通过 `api/` 调用领域 service，不把 Gradio 组件直接暴露给 API。

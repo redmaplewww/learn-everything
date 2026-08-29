@@ -2,6 +2,7 @@
 
 from contextlib import asynccontextmanager
 import logging
+import os
 from pathlib import Path
 from uuid import uuid4
 
@@ -110,7 +111,7 @@ def create_app(frontend_dir: Path | None = None) -> FastAPI:
     app.include_router(resources.router, prefix="/api/v1")
     app.include_router(configuration.router, prefix="/api/v1")
     resolved_frontend_dir = frontend_dir if frontend_dir is not None else _frontend_out_dir()
-    if resolved_frontend_dir.is_dir():
+    if os.environ.get("LEARNING_DEV_MODE") != "1" and resolved_frontend_dir.is_dir():
         app.mount("/", StaticFiles(directory=resolved_frontend_dir, html=True), name="frontend")
     return app
 

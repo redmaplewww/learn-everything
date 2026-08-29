@@ -27,6 +27,15 @@ def test_app_serves_exported_frontend_from_configured_directory(tmp_path):
     assert "Next.js 静态前端" in response.text
 
 
+def test_dev_mode_does_not_serve_exported_frontend(tmp_path, monkeypatch):
+    (tmp_path / "index.html").write_text("<main>Next.js 静态前端</main>", encoding="utf-8")
+    monkeypatch.setenv("LEARNING_DEV_MODE", "1")
+
+    response = TestClient(create_app(frontend_dir=tmp_path)).get("/")
+
+    assert response.status_code == 404
+
+
 def test_list_projects_returns_application_order(session):
     session.add(LearningProject(user_id="default", title="旧项目", topic="主题"))
     session.commit()

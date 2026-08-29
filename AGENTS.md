@@ -18,8 +18,8 @@
 setup.bat
 
 # 启动 (开发模式，浏览器或 PyWebView 窗口)
-run.bat
-# 或直接: kotaemon\.venv\Scripts\python.exe launcher.py
+start.bat
+# 或直接: kotaemon\.venv\Scripts\python.exe scripts\start_frontend_dev.py
 
 # 查看后端日志: 启动时控制台实时输出
 # 数据落: kotaemon\ktem_app_data\
