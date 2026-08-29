@@ -44,6 +44,8 @@ def test_backend_disables_unsupported_user_management(monkeypatch):
     launcher.start_gradio_backend(7860)
 
     assert captured["env"]["KH_FEATURE_USER_MANAGEMENT"] == "0"
+    assert captured["env"]["PYTHONUTF8"] == "1"
+    assert captured["env"]["PYTHONIOENCODING"] == "utf-8"
 
 
 def test_api_backend_uses_fastapi_entrypoint_and_source_paths(monkeypatch):
@@ -65,6 +67,8 @@ def test_api_backend_uses_fastapi_entrypoint_and_source_paths(monkeypatch):
     assert captured["cwd"] == str(launcher.BASE_DIR)
     assert str(launcher.BASE_DIR) in captured["env"]["PYTHONPATH"]
     assert str(launcher.KOTAEMON_DIR) in captured["env"]["PYTHONPATH"]
+    assert captured["env"]["PYTHONUTF8"] == "1"
+    assert captured["env"]["PYTHONIOENCODING"] == "utf-8"
 
 
 def test_frontend_assets_ready_requires_exported_index(tmp_path, monkeypatch):

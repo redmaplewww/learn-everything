@@ -157,6 +157,8 @@ def start_gradio_backend(port: int) -> subprocess.Popen:
     env["GRADIO_SERVER_PORT"] = str(port)
     env["PYTHONPATH"] = str(BASE_DIR) + os.pathsep + env.get("PYTHONPATH", "")
     env["PYTHONUNBUFFERED"] = "1"
+    env["PYTHONUTF8"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
 
     log.info(f"启动后端: {VENV_PYTHON} {CUSTOM_APP}")
     proc = subprocess.Popen(
@@ -194,6 +196,8 @@ def start_api_backend(port: int) -> subprocess.Popen:
         [str(BASE_DIR), str(KOTAEMON_DIR), env.get("PYTHONPATH", "")]
     )
     env["PYTHONUNBUFFERED"] = "1"
+    env["PYTHONUTF8"] = "1"
+    env["PYTHONIOENCODING"] = "utf-8"
 
     command = [
         str(VENV_PYTHON),
