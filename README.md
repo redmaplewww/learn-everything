@@ -7,7 +7,8 @@
 ## 快速开始
 
 ### 首次使用（开发者/高级用户）
-1. **初始化环境**（需联网，约 5-15 分钟）：双击 `setup.bat`
+0. **准备前置环境**：安装 Node.js 20+，并确保 `node`、`npm` 在 PATH 中；脚本不会自动安装 Node.js
+1. **初始化环境**（需联网，约 5-15 分钟）：双击 `setup.bat`。脚本会安装 Python、FSRS、PyWebView、PyInstaller 和 Next.js 依赖，并执行前端类型检查
 2. **配置 LLM**：编辑 `kotaemon\.env`，填入任一 API key（DeepSeek 推荐）
 3. **启动**：双击 `start.bat`
 
@@ -39,7 +40,7 @@ kotaemon\.venv\Scripts\python.exe scripts\start_frontend_dev.py
 | `scripts/start_frontend_dev.py` | 本地开发服务编排与日志转发 |
 | `launcher.py` | 构建/桌面启动器：启动 FastAPI 静态前端 + PyWebView 窗口 |
 | `api/main.py` | FastAPI 后端入口，托管 `/api/v1` 与构建后的 Next.js 静态资源 |
-| `setup.bat` | 首次环境初始化（装 uv + venv + 依赖） |
+| `setup.bat` | 首次环境初始化（uv + Python + FSRS/PyWebView/PyInstaller + Next.js 依赖与类型检查） |
 | `build_exe.bat` | 打包 launcher.exe |
 | `pack_portable.bat` | 组装可分发的完整便携版 |
 | `learning_ext/` | 学习特化代码（路线/复习/测验/看板等） |
