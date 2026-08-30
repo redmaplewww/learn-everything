@@ -1,8 +1,8 @@
-# 前端技术栈调研
+# 前端技术栈与架构基线
 
 > 调研日期：2026-08-29  
 > 调研范围：当前仓库源码、依赖清单、开发脚本、打包脚本与启动链路  
-> 结论口径：以实际默认运行路径为准，区分现行主栈与兼容回退栈
+> 结论口径：以当前实际运行路径为准，项目侧只保留 Next.js + FastAPI
 
 ## 1. 结论摘要
 
@@ -98,9 +98,9 @@ PyWebView 只是桌面窗口容器，不参与 React 渲染、状态管理或 AP
 
 组件没有依赖 shadcn/ui、MUI、Ant Design 等设计系统。按钮、表单、状态卡片和 Tab 都由原生 HTML + CSS 实现。
 
-## 7. 已移除的 Gradio 栈
+## 7. 迁移历史记录
 
-项目侧不再保留 Kotaemon/Gradio UI：
+项目侧已删除 Kotaemon/Gradio UI，以下记录仅用于说明迁移边界：
 
 - `custom_app.py`、`learning_ext/app.py` 和 `learning_ext/pages/` 已删除；
 - `launcher.py` 只启动 FastAPI，并由其托管 Next.js 静态资源。
