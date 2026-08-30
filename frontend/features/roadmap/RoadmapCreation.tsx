@@ -4,7 +4,6 @@ import { AlertCircle, ArrowRight, CheckCircle2, LoaderCircle, RotateCcw, Sparkle
 import { FormEvent, useEffect, useState } from "react";
 
 import {
-  ApiError,
   cancelContentPreparation,
   createProject,
   getContentPreparation,
@@ -15,15 +14,9 @@ import {
   type ContentPreparation,
   type RoadmapPreview,
 } from "../../lib/api";
+import { formatError } from "../../lib/errors";
 
 type CreationState = "idle" | "previewing" | "ready" | "saving" | "preparing" | "error";
-
-function formatError(error: unknown) {
-  if (error instanceof ApiError) {
-    return error.requestId ? `${error.message}（请求编号：${error.requestId}）` : error.message;
-  }
-  return "本地学习服务不可用，请确认 FastAPI 已启动。";
-}
 
 export function RoadmapCreation({ onCreated }: { onCreated: (projectId: number) => void }) {
   const [topic, setTopic] = useState("");
@@ -44,7 +37,7 @@ export function RoadmapCreation({ onCreated }: { onCreated: (projectId: number) 
         .then((current) => setCreation(current))
         .catch((pollError) => {
           window.clearInterval(timer);
-          setError(formatError(pollError));
+          setError(formatError(pollError, "本地学习服务不可用，请确认 FastAPI 已启动。"));
           setState("error");
         });
     }, 2_000);
@@ -59,7 +52,7 @@ export function RoadmapCreation({ onCreated }: { onCreated: (projectId: number) 
       setPreview(await previewRoadmap({ topic, background, goal, weekly_hours: weeklyHours }));
       setState("ready");
     } catch (generateError) {
-      setError(formatError(generateError));
+      setError(formatError(generateError, "本地学习服务不可用，请确认 FastAPI 已启动。"));
       setState("error");
     }
   };
@@ -74,7 +67,7 @@ export function RoadmapCreation({ onCreated }: { onCreated: (projectId: number) 
       setInstruction("");
       setState("ready");
     } catch (refineError) {
-      setError(formatError(refineError));
+      setError(formatError(refineError, "本地学习服务不可用，请确认 FastAPI 已启动。"));
       setState("error");
     }
   };
@@ -90,7 +83,7 @@ export function RoadmapCreation({ onCreated }: { onCreated: (projectId: number) 
       setCreation(preparation);
       setCreatedProjectId(project.project_id);
     } catch (saveError) {
-      setError(formatError(saveError));
+      setError(formatError(saveError, "本地学习服务不可用，请确认 FastAPI 已启动。"));
       setState("error");
     }
   };
@@ -101,7 +94,7 @@ export function RoadmapCreation({ onCreated }: { onCreated: (projectId: number) 
     try {
       setCreation(await cancelContentPreparation(creation.project_id, creation.job_id));
     } catch (cancelError) {
-      setError(formatError(cancelError));
+      setError(formatError(cancelError, "本地学习服务不可用，请确认 FastAPI 已启动。"));
     }
   };
 
@@ -111,7 +104,7 @@ export function RoadmapCreation({ onCreated }: { onCreated: (projectId: number) 
     try {
       setCreation(await retryContentPreparation(creation.project_id, creation.job_id));
     } catch (retryError) {
-      setError(formatError(retryError));
+      setError(formatError(retryError, "本地学习服务不可用，请确认 FastAPI 已启动。"));
     }
   };
 

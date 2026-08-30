@@ -123,10 +123,17 @@
 
 #### 目标与范围
 
-- [ ] 先形成拆分方案，明确页面组合根、项目列表、工作台、节点详情、项目 CRUD 弹窗和各标签页的职责边界，以及状态和回调的所有权。
-- [ ] 按领域将 `frontend/app/page.tsx` 拆分为可独立理解和验证的组件、hooks 或 feature 模块；页面组合根只保留路由级状态和跨模块编排。
-- [ ] 保持现有 API 契约、项目切换、节点状态更新、生成操作、错误处理和响应式布局行为不变，不借此引入新的状态管理框架。
-- [ ] 为拆分后的关键交互补充组件或页面级测试，并通过 `npm run typecheck`、`npm run build` 和正式 Rust 项目浏览器回归。
+- [x] 先形成拆分方案，明确页面组合根、项目列表、工作台、节点详情、项目 CRUD 弹窗和各标签页的职责边界，以及状态和回调的所有权。
+- [x] 按领域将 `frontend/app/page.tsx` 拆分为可独立理解和验证的组件、hooks 或 feature 模块；页面组合根只保留当前视图、当前项目选择和跨模块刷新协调。
+  - 实际修改：新增 `frontend/features/projects/`、`frontend/features/workspace/`、`frontend/features/roadmap/`、`frontend/features/dashboard/`、`frontend/features/review/`、`frontend/features/quiz/` 模块；`page.tsx` 收敛为组合根；通用错误转换集中至 `frontend/lib/errors.ts`。
+- [x] 保持现有 API 契约、项目切换、节点状态更新、生成操作、错误处理和响应式布局行为不变，不借此引入新的状态管理框架。
+  - 实际验证：保留现有 REST/SSE 调用和 CSS class；节点状态更新继续乐观更新并失败回滚；路线详情跨标签保留，正式 Rust 项目六个标签和 390px 窄屏均通过只读浏览器回归。
+- [x] 为拆分后的关键交互补充组件或页面级测试，并通过 `npm run typecheck`、`npm run build` 和正式 Rust 项目浏览器回归。
+  - 实际修改：新增 Vitest、React Testing Library、jsdom 测试配置和 4 组前端测试，覆盖项目弹窗、项目选择/删除回退、节点状态成功/回滚、路线详情往返和详情操作错误。
+  - 自动验证：`npm run test`（8 项通过）、`npm run typecheck`、`npm run build`。
+  - 手工验证：正式 Rust 项目完成项目切换、六个标签页、路线节点详情进入/返回及 390px 窄屏无横向溢出检查；未触发生成、保存、状态更新或删除写操作。
+  - 完成日期：2026-08-30
+- [ ] 前端拆分重构及验证完成后，结合 `docs/FRONTEND_TECH_STACK_RESEARCH.md` 编写 `docs/FRONTEND_ARCHITECTURE.md`；文档必须以实际落地架构为准，覆盖前端技术选型、目录与模块职责、状态和回调所有权、API 与数据流、开发/构建/桌面运行链路、测试策略及扩展约定，作为开发者理解和维护前端架构的入口文档。
 
 #### 非目标
 
