@@ -2,7 +2,7 @@
 
 > 更新日期：2026-08-30。本文是项目唯一的当前 TODO 文档。
 > 组织方式：按用户可感知的 Feature 管理；每个 Feature 同时包含后端、API、前端和验收。
-> 当前范围：浏览器前端、FastAPI、application 和项目侧 service。桌面 exe、便携版、PyWebView 暂停；Gradio 保留为回退入口。
+> 当前范围：浏览器前端、FastAPI、application、项目侧 service，以及桌面 exe/便携版/PyWebView 交付链路；Gradio 保留为回退入口。
 
 ## 当前运行基线
 
@@ -14,7 +14,7 @@
 
 ## 主 Feature List
 
-> 当前执行顺序：Feature 1 -> Feature 2 -> Feature 3 -> Feature 5 -> Feature 8。Feature 4、Feature 6 暂时挂起，保留原编号以维持文档引用稳定。
+> 当前执行顺序：Feature 1 -> Feature 2 -> Feature 3 -> Feature 5 -> Feature 8 -> Feature 9。Feature 4、Feature 6 暂时挂起，保留原编号以维持文档引用稳定。
 
 ### Feature 1：创建并调整学习路线，选择项目开始学习
 
@@ -140,6 +140,16 @@
 - 不在本 Feature 中重设计业务流程、API 契约或视觉风格。
 - 不因拆分移除 Gradio 回退入口或修改 Kotaemon 底座。
 
+### Feature 9：桌面 exe 与便携版交付
+
+- [x] 执行 `cd frontend && npm run build`，生成与当前源码一致的 `frontend/out` 静态前端（2026-08-30）。
+- [x] 执行 `build_exe.bat`，生成包含启动器和 PyWebView 依赖的 `LearnEverything.exe`（2026-08-30）。
+- [x] 执行 `pack_portable.bat`，组装包含 `api/`、`learning_ext/`、静态前端和 Kotaemon Python venv 的便携目录（2026-08-30）。
+- [x] 检查便携目录存在 `frontend/out/index.html`、`api/main.py` 和 `kotaemon/.venv/Scripts/python.exe`，并确认 exe 不依赖开发机 Node.js（2026-08-30）。
+- [x] 启动便携版，验收 FastAPI `/` 静态页面和 `/api/v1/projects` 接口均返回 200（2026-08-30）；完整工作区操作仍待验收。
+- [x] 设置 `LE_DESKTOP=1` 验收 PyWebView 窗口模式；窗口标题为“学习 Agent”，加载“学习轨迹”页面，关闭窗口后启动器和后端进程均退出（2026-08-30）。无 PyWebView 浏览器回退仍待单独验收。
+- [ ] 发布前移除或替换 `kotaemon/.env` 中的开发机密钥，保留配置模板并验证首次启动提示。
+
 ## 工程基础：数据、测试与文档
 
 ### 数据与工程保障
@@ -229,7 +239,6 @@
 
 ## 其他暂停范围
 
-- [ ] 桌面 exe、便携版、PyWebView 和桌面端矩阵：用户已明确暂停，不阻塞浏览器前后端工作。
 - [ ] Gradio 移除：等待所有 Feature 完成最终对照回归，并再次取得删除确认。
 
 ## 已知风险
@@ -244,5 +253,5 @@
   - 这部分内容需要由人类确认上面的 TODOS 列表中有对应的内容，才能移除。
   - 本模块长期保留；只移除已经完成体系化并经人类确认的具体条目，不删除模块本身。
 ## TODOS
-- 已整理：LLM 长操作后台执行、历史结果留存/比较/选择和统一进度反馈 -> Feature 6“查询并管理 LLM 任务与异常处理”。
-- 已整理：`frontend\app\page.tsx` 解耦拆分方案与实施 -> Feature 8“前端工作台模块化拆分”。
+- 优化 RAG 功能
+  - RAG 对话区域 MD 渲染

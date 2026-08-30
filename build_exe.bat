@@ -43,7 +43,7 @@ echo [3/3] PyInstaller 打包中 (约 1-3 分钟)...
     --hidden-import "webview" ^
     --hidden-import "webview.platforms.edgechromium" ^
     --collect-submodules "webview" ^
-    --add-data "frontend\out;frontend\out" ^
+    --add-data "%CD%\frontend\out;frontend\out" ^
     --distpath dist ^
     --workpath build ^
     --specpath build ^
