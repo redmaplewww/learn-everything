@@ -38,7 +38,7 @@ kotaemon\.venv\Scripts\python.exe scripts\start_frontend_dev.py
 | `start.bat` | 推荐启动入口：同时启动 Next.js（3000）与 FastAPI（8000） |
 | `scripts/start_frontend_dev.py` | 本地开发服务编排与日志转发 |
 | `launcher.py` | 构建/桌面启动器：启动 FastAPI 静态前端 + PyWebView 窗口 |
-| `custom_app.py` | 后端入口：加载 LearningApp（Kotaemon + 学习 Tab） |
+| `api/main.py` | FastAPI 后端入口，托管 `/api/v1` 与构建后的 Next.js 静态资源 |
 | `setup.bat` | 首次环境初始化（装 uv + venv + 依赖） |
 | `build_exe.bat` | 打包 launcher.exe |
 | `pack_portable.bat` | 组装可分发的完整便携版 |
@@ -59,7 +59,9 @@ kotaemon\.venv\Scripts\python.exe scripts\start_frontend_dev.py
 | 📤 导出 | ⏳ 阶段4 | Anki 牌组 / Markdown / PDF 报告 |
 
 ## 技术栈
-- **底座**: Kotaemon (Gradio + SQLite + Chroma + LanceDB)
+- **底座**: Kotaemon (SQLite + Chroma + LanceDB)
+- **前端**: Next.js + React + TypeScript
+- **API**: FastAPI
 - **记忆**: fsrs (FSRS v6)
 - **桌面**: PyWebView (Edge WebView2)
 - **打包**: PyInstaller

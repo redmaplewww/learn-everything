@@ -1,6 +1,6 @@
 # `learning_ext` 学习特化层
 
-`learning_ext` 是 Learn Everything 的学习领域代码，位于 Kotaemon RAG 底座之上。它负责学习路线、知识节点、掌握度、间隔复习、测验、学习笔记和学习看板等业务能力；Kotaemon 负责运行时、LLM 配置和资料库/RAG 能力。当前主界面由 Next.js 提供，经 FastAPI 调用本目录的领域服务；保留的 Gradio 页面仅用于兼容旧入口。
+`learning_ext` 是 Learn Everything 的学习领域代码，位于 Kotaemon RAG 底座之上。它负责学习路线、知识节点、掌握度、间隔复习、测验、学习笔记和学习看板等业务能力；Kotaemon 负责运行时、LLM 配置和资料库/RAG 能力。当前界面由 Next.js 提供，经 FastAPI 调用本目录的领域服务。
 
 本目录的代码应当可以在未来被独立的 HTTP API 或 Next.js 前端复用。因此，页面负责 UI 编排，领域模块负责业务规则，数据模型负责持久化结构，LLM 调用统一经过 `learning_ext.llm`。
 
@@ -9,8 +9,7 @@
 | 想了解什么 | 建议阅读顺序 |
 | --- | --- |
 | 浏览器应用如何启动 | `start.bat` → `scripts/start_frontend_dev.py` → `api/main.py` → `bootstrap.py` |
-| 旧 Gradio 入口如何启动 | `custom_app.py` → `app.py` → `bootstrap.py` |
-| 一个 Tab 如何接入 | `pages/path_generator.py` → `app.py._build_learning_tabs` |
+| 前后端如何通信 | `frontend/` → `api/main.py` → `application/` |
 | 学习路线如何落库 | `path_generator/service.py` → `db/models.py` |
 | 掌握度如何变化 | `progress/service.py` → `progress/study.py` |
 | LLM 如何调用 | `llm/client.py` → 各领域模块的 `service.py` |
@@ -43,10 +42,9 @@ ktem.db.engine.engine + kotaemon/.env 中的 LLM 配置
 
 - `scripts/start_frontend_dev.py` 是日常开发入口：启动 Next.js（3000）与 FastAPI（8000），并设置 `LEARNING_DEV_MODE=1`，让 8000 只提供 API。
 - `api/main.py` 是浏览器应用的后端入口：注册 `/api/v1` 路由，在启动生命周期中调用 `bootstrap.init_learning_ext()`。
-- `custom_app.py` 与 `app.py` 仍保留 Gradio 兼容入口，不是当前主界面路径。
 - `bootstrap.py` 负责幂等初始化学习表、补齐本地 SQLite 的新增列，并检查 `fsrs` 是否可用。
 - 学习表复用 Kotaemon 的 SQLModel engine，表名统一使用 `le_` 前缀；运行数据位于 `kotaemon/ktem_app_data/`，不属于源码目录。
-- 领域服务可以依赖共享的数据库 engine 和 LLM facade，但不应把 Next.js、FastAPI 或 Gradio 组件传入领域模块。
+- 领域服务可以依赖共享的数据库 engine 和 LLM facade，但不应把 Next.js 或 FastAPI 组件传入领域模块。
 - `llm/client.py` 读取 `kotaemon/.env` 的 OpenAI 兼容配置并负责客户端、重试和 JSON 解析；它复用的是项目配置约定，不直接调用 Kotaemon 的 `llms manager`。
 
 ## 目录结构与职责
@@ -54,21 +52,9 @@ ktem.db.engine.engine + kotaemon/.env 中的 LLM 配置
 ```text
 learning_ext/
 ├── __init__.py              # 包级说明、底座导入所需的占位环境变量
-├── app.py                   # LearningApp：页面注册、全局样式、事件接入
 ├── bootstrap.py             # 建表、SQLite 列补齐、FSRS 可用性检查
 ├── guide.py                 # 应用内“使用指南”Markdown
 ├── project_ops.py           # 项目学习数据的级联清理与删除
-├── assets/
-│   └── word_lookup.js       # 浏览器端划词/术语解释脚本，由 custom_app.py 注入
-│
-├── pages/                   # Gradio UI 适配层，每个页面继承 ktem.app.BasePage
-│   ├── quick_setup.py       # 模型配置与连通性测试
-│   ├── path_generator.py    # 学习路线 Tab
-│   ├── study_workbench.py   # 节点内容、笔记、资料和学习推进工作台
-│   ├── review.py            # FSRS 复习 Tab
-│   ├── quiz.py              # 查漏测验 Tab
-│   └── dashboard.py         # 学习看板 Tab
-│
 ├── db/
 │   └── models.py            # 所有 le_* SQLModel 表模型
 ├── llm/
@@ -120,8 +106,8 @@ LearningProject
 ### 生成并保存学习路线
 
 ```text
-PathGeneratorPage
-  -> path_generator.generate_roadmap()
+RoadmapCreation (Next.js)
+  -> api/routers/roadmaps.py
   -> learning_ext.llm.chat_json()
   -> path_generator.save_roadmap(session, ...)
   -> LearningProject / KnowledgeNode / KnowledgeEdge
@@ -130,7 +116,7 @@ PathGeneratorPage
 ### 一次复习或测验如何影响掌握度
 
 ```text
-ReviewPage                  QuizPage
+ReviewPanel (Next.js)       QuizPanel (Next.js)
   -> fsrs_review.review_card  -> quiz.grade_answer
   -> ReviewLog / Card         -> QuizAttempt
                  \             /
@@ -138,7 +124,7 @@ ReviewPage                  QuizPage
                      -> KnowledgeNode.mastery
 ```
 
-页面可以组合多个服务，但业务规则应留在领域模块中。例如新增“下一步学习”策略时，优先修改 `progress/study.py`，而不是在 `StudyWorkbenchPage` 中复制查询逻辑。
+前端组件只负责交互和展示，业务规则应留在领域模块中。例如新增“下一步学习”策略时，优先修改 `progress/study.py`。
 
 ## 开发约定
 
@@ -146,7 +132,7 @@ ReviewPage                  QuizPage
 2. 需要数据库的 service 函数通常把 `session: Session` 作为第一个参数；这样便于测试、组合调用和控制事务。
 3. LLM 调用统一使用 `learning_ext.llm.chat` 或 `chat_json`，模型配置遵循 `kotaemon/.env` 的 OpenAI 兼容约定；不要在业务模块中直接创建客户端。
 4. 新增或调整提示词时，放在对应模块的 `prompts.py`；当前路线模块已有该约定。
-5. 新增 Tab：在 `pages/` 创建 `BasePage` 子类，在 `pages/__init__.py` 导出，并在 `app.py._build_learning_tabs()` 注册；事件绑定放在页面的 `on_register_events()`。
+5. 新增界面功能：在 `frontend/features/` 添加组件，通过 `api/routers/` 暴露所需 HTTP 契约。
 6. 数据模型变更先更新 `db/models.py`，再考虑 `bootstrap.py` 的 SQLite 兼容补列；不要把迁移逻辑藏在页面事件中。
 7. `notes.service` 的 URL 抓取和 `practice.auto_setup` 的命令执行都涉及外部输入/本机副作用，修改时必须单独评估安全边界。
 
@@ -157,7 +143,7 @@ ReviewPage                  QuizPage
 | 新增持久化实体或字段 | `db/models.py`，必要时 `bootstrap.py` |
 | 新增学习规则/算法 | 对应领域目录的 `service.py` 或 `progress/study.py` |
 | 新增 AI 输出格式 | 对应领域的 `prompts.py` 和 service 解析逻辑 |
-| 新增用户界面 | `pages/`，再由 `app.py` 注册 |
+| 新增用户界面 | `frontend/features/`，并在 `api/` 增加契约 |
 | 新增跨模块项目清理 | `project_ops.py` |
 | 新增导出格式 | `exporter/service.py` |
 | 替换模型供应商或配置读取 | `llm/client.py`，不改各业务调用方 |
@@ -166,5 +152,5 @@ ReviewPage                  QuizPage
 
 - 日常启动验证使用 `start.bat`，访问 `http://127.0.0.1:3000`；8000 仅用于 API 调试。首次启动会加载较多底座依赖。
 - 修改 `learning_ext` 或 `api/` 后重启开发脚本即可生效；修改桌面打包路径的 `launcher.py` 后才需要重新执行 `build_exe.bat`。
-- 业务服务应优先做函数级测试，页面测试只覆盖事件编排和关键交互。完整测试入口可能受 Kotaemon 自带测试的导入环境影响，因此应区分学习模块测试与仓库全量测试。
-- 当前主页面层为 `frontend/`（Next.js），Gradio 适配层仍保留兼容用途。新功能优先通过 `api/` 调用领域 service，不把 Gradio 组件直接暴露给 API。
+- 业务服务应优先做函数级测试，前端组件使用 Vitest/React Testing Library 覆盖交互。完整测试入口可能受 Kotaemon 自带测试的导入环境影响，因此应区分学习模块测试与仓库全量测试。
+- 当前页面层为 `frontend/`（Next.js），所有业务访问统一通过 `api/` 的 FastAPI 契约。

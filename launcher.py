@@ -3,7 +3,7 @@
 职责：
     1. 定位 Kotaemon venv 和项目根目录
     2. 设置环境变量 (Python 路径、cohere 占位等)
-    3. 启动 FastAPI 静态前端服务；必要时保留 Gradio 回退服务
+    3. 启动 FastAPI 静态前端服务
     4. 主线程用 PyWebView 打开桌面窗口 (可选，环境无 pywebview 则退化为浏览器)
 
 使用：
@@ -80,10 +80,7 @@ else:
 
 KOTAEMON_DIR = BASE_DIR / "kotaemon"
 VENV_PYTHON = KOTAEMON_DIR / ".venv" / "Scripts" / "python.exe"
-CUSTOM_APP = BASE_DIR / "custom_app.py"
-
 API_PORT = 8000
-GRADIO_PORT = 7860
 HOST = "127.0.0.1"
 
 
@@ -110,7 +107,7 @@ def ensure_venv() -> None:
     sys.exit(1)
 
 
-def find_free_port(default: int = 7860) -> int | None:
+def find_free_port(default: int = API_PORT) -> int | None:
     """默认端口被占用时，返回后续可用端口。"""
     for port in range(default, default + 20):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -139,52 +136,6 @@ def wait_for_server(port: int, timeout: int = 120, process: subprocess.Popen | N
         except (OSError, URLError):
             time.sleep(1)
     return False
-
-
-def start_gradio_backend(port: int) -> subprocess.Popen:
-    """以子进程启动 Gradio 后端 (custom_app.py)。
-
-    用子进程而非线程，避免 Gradio/uvicorn 信号处理干扰主进程，
-    也便于打包后隔离。
-    """
-    env = os.environ.copy()
-    # 占位 key 避免 Kotaemon 初始化 cohere 等服务校验
-    for k in ("COHERE_API_KEY", "VOYAGE_API_KEY", "MISTRAL_API_KEY", "GOOGLE_API_KEY"):
-        env.setdefault(k, "placeholder-key-1234567890")
-    # LearningApp 未实现 Kotaemon 的登录页，必须关闭默认用户管理功能。
-    env["KH_FEATURE_USER_MANAGEMENT"] = "0"
-    env["GRADIO_SERVER_NAME"] = HOST
-    env["GRADIO_SERVER_PORT"] = str(port)
-    env["PYTHONPATH"] = str(BASE_DIR) + os.pathsep + env.get("PYTHONPATH", "")
-    env["PYTHONUNBUFFERED"] = "1"
-    env["PYTHONUTF8"] = "1"
-    env["PYTHONIOENCODING"] = "utf-8"
-
-    log.info(f"启动后端: {VENV_PYTHON} {CUSTOM_APP}")
-    proc = subprocess.Popen(
-        [str(VENV_PYTHON), str(CUSTOM_APP)],
-        cwd=str(KOTAEMON_DIR),
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        bufsize=1,
-    )
-
-    # 后台线程转发后端日志
-    def _log_pipe():
-        try:
-            for line in proc.stdout:
-                line = line.rstrip()
-                if line:
-                    log.info(f"[backend] {line}")
-        except Exception:
-            pass
-
-    threading.Thread(target=_log_pipe, daemon=True).start()
-    return proc
 
 
 def start_api_backend(port: int) -> subprocess.Popen:
@@ -270,22 +221,20 @@ def main():
 
     ensure_venv()
 
-    use_gradio = os.environ.get("LE_UI", "next").lower() == "gradio"
-    if not use_gradio and not frontend_assets_ready():
+    if not frontend_assets_ready():
         log.error("未找到 frontend/out/index.html，无法启动新前端。请先在 frontend 目录执行 npm run build。")
         pause_before_exit()
         sys.exit(1)
-    default_port = GRADIO_PORT if use_gradio else API_PORT
-    port = find_free_port(default_port)
+    port = find_free_port(API_PORT)
     if port is None:
-        log.error(f"端口 {default_port}-{default_port + 19} 均被占用，未启动服务。")
+        log.error(f"端口 {API_PORT}-{API_PORT + 19} 均被占用，未启动服务。")
         pause_before_exit()
         sys.exit(1)
-    if port != default_port:
-        log.warning(f"端口 {default_port} 被占用，改用 {port}")
+    if port != API_PORT:
+        log.warning(f"端口 {API_PORT} 被占用，改用 {port}")
 
-    proc = start_gradio_backend(port) if use_gradio else start_api_backend(port)
-    mode_name = "Gradio 回退服务" if use_gradio else "FastAPI 静态前端服务"
+    proc = start_api_backend(port)
+    mode_name = "FastAPI 静态前端服务"
     log.info(f"等待{mode_name}就绪 (最多 180s)...")
     if not wait_for_server(port, timeout=180, process=proc):
         log.error(f"{mode_name}未能就绪或已提前退出，请查看上方日志")

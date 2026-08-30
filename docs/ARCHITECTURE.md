@@ -1,6 +1,6 @@
 # 学习 Agent 架构文档
 
-> 当前运行基线：Next.js 浏览器前端 + FastAPI API。日常入口为 `start.bat`，访问 `http://127.0.0.1:3000`。PyWebView/Gradio 仅保留为构建与兼容路径，桌面分发暂不作为日常开发目标。
+> 当前运行基线：Next.js 浏览器前端 + FastAPI API。日常入口为 `start.bat`，访问 `http://127.0.0.1:3000`。PyWebView 仅作为可选桌面窗口容器。
 
 ## 1. 当前运行架构
 
@@ -17,7 +17,7 @@ start.bat
 
 构建或桌面打包前执行 `frontend` 目录内的 `npm run build`。此时 `launcher.py` 或打包 exe 启动 FastAPI，并从 `frontend/out` 在 `http://127.0.0.1:8000/` 提供静态页面。该路径用于构建产物，不替代开发入口。
 
-## 2. 历史 Gradio/桌面架构
+## 2. 桌面容器架构
 
 ```text
 ┌──────────────────────────────────────────────────────────┐
@@ -27,7 +27,7 @@ start.bat
                          │ subprocess (Kotaemon venv python)
                          ▼
 ┌──────────────────────────────────────────────────────────┐
-│              custom_app.py (Gradio 后端)                  │
+│              api/main.py (FastAPI 后端)                  │
 │              http://127.0.0.1:7860                        │
 │  Kotaemon 原生 Tab          学习特化 Tab (新增)           │
 │  ┌──────┐┌──────┐   ┌─────────┐┌─────┐┌─────┐┌─────┐   │
@@ -100,9 +100,8 @@ PDF 引用高亮、ReAct/ReWOO Agent、GraphRAG、Docker 部署。**这些占学
 `learning_ext/` 独立于 Kotaemon 代码树，只通过三个公共接口耦合：
 - `ktem.db.engine.engine` (共享 SQLite)
 - `ktem.llms.manager.llms` (共享 LLM 配置)
-- `ktem.app.BasePage` (Gradio Tab 基类)
 
-**当前状态**：浏览器前端已经通过 FastAPI 调用 `learning_ext` 领域服务。Kotaemon 继续提供 SQLite、LLM 配置和 RAG 能力；旧 `BasePage` 依赖仅留在 Gradio 兼容层。
+**当前状态**：浏览器前端通过 FastAPI 调用 `learning_ext` 领域服务。Kotaemon 继续提供 SQLite、LLM 配置和 RAG 能力。
 
 ### 2.3 FSRS v6 而非 SM-2
 采用 [Free Spaced Repetition Scheduler](https://github.com/open-spaced-repetition)
@@ -118,7 +117,7 @@ learn-everything/
 ├── frontend/                 # Next.js 页面（开发态由 3000 提供）
 ├── api/                      # FastAPI 路由与应用入口
 ├── launcher.py               # 构建/桌面启动器 (PyWebView + 静态前端)
-├── custom_app.py             # 后端入口 (LearningApp，设置 sys.path/环境变量)
+├── api/main.py               # FastAPI 后端入口
 ├── setup.bat                 # 首次环境初始化 (uv + venv + 依赖)
 ├── build_exe.bat             # PyInstaller 打 launcher.exe
 ├── pack_portable.bat         # 组装完整便携版
@@ -141,7 +140,6 @@ learn-everything/
 │   ├── feynman/              # 阶段4: 费曼/苏格拉底对话
 │   ├── practice/             # 阶段4: 环境/实操辅助
 │   ├── exporter/             # 阶段4: 导出 Anki/MD/PDF
-│   └── pages/                # Gradio Tab (路线Tab 已可用)
 │
 ├── kotaemon/ktem_app_data/   # 运行时数据 (gitignore)
 │   └── user_data/
@@ -160,17 +158,17 @@ learn-everything/
 ```
 ┌──────────────────────────────────── 表现层：两套前端 ────────────────────────────────────┐
 │                                                                                           │
-│  Next.js / React 默认前端                           Gradio 兼容回退前端                  │
-│  frontend/                                         custom_app.py                          │
-│  浏览器开发 :3000；构建后可由 PyWebView 承载        LE_UI=gradio 时运行 :7860              │
+│  Next.js / React 前端                              FastAPI 静态服务                     │
+│  frontend/                                         api/main.py                           │
+│  浏览器开发 :3000；构建后可由 FastAPI 托管         统一提供 API 与静态资源               │
 └────────────────────────────┬───────────────────────────────────┬──────────────────────────┘
                              │                                   │
-                             │ HTTP REST / SSE                   │ Gradio 组件事件回调
+                             │ HTTP REST / SSE                   │
                              ▼                                   ▼
 ┌────────────────────────────────────┐      ┌────────────────────────────────────────────┐
-│ FastAPI HTTP 接入适配层             │      │ Gradio 页面接入适配层                       │
+│ FastAPI HTTP 接入适配层             │      │ Next.js 页面                             │
 │                                    │      │                                            │
-│ api/main.py                         │      │ custom_app.py                               │
+│ api/main.py                         │      │ frontend/                                  │
 │ - 创建 FastAPI 应用                 │      │ - 创建 LearningApp                          │
 │ - 注册 /api/v1 路由                 │      │                                            │
 │ - 开发态 CORS、生产态静态托管        │      │ learning_ext/app.py                         │
@@ -178,9 +176,9 @@ learn-everything/
 │ api/routers/*.py                    │      │ - init_learning_ext()                       │
 │ - HTTP 请求 / 响应编排              │      │ - _build_learning_tabs() 注册学习 Tab       │
 │                                    │      │                                            │
-│ api/schemas/*.py                    │      │ learning_ext/pages/*.py                     │
+│ api/schemas/*.py                    │      │ frontend/features/*.tsx                    │
 │ - 请求 DTO、响应 DTO                │      │ - PathGeneratorPage / ReviewPage 等         │
-│                                    │      │ - 绑定 Gradio UI 与事件回调                 │
+│                                    │      │ - 绑定页面交互与 API 调用                  │
 │ api/dependencies.py                 │      │                                            │
 │ - Session、RAG Gateway 等依赖注入   │      │ 页面回调直接调用应用服务                     │
 └─────────────────────┬──────────────┘      └─────────────────────┬──────────────────────┘
@@ -206,14 +204,13 @@ learn-everything/
 ```
 
 两套前端共用的是 `learning_ext/` 业务核心及 Kotaemon 基础设施，接入方式不同：Next.js 通过
-`frontend/lib/api.ts` 调用 FastAPI 的 `/api/v1` 契约；Gradio 由 `LearningApp` 装配
-`learning_ext/pages/`，页面事件回调直接调用同一批 `learning_ext/application/` 应用服务。
+`frontend/lib/api.ts` 调用 FastAPI 的 `/api/v1` 契约，页面组件直接使用
+`learning_ext/application/` 提供的应用服务。
 
-### 5.2 历史桌面运行机制（兼容路径）
-目前新前端还没有做 Desktop 兼容
+### 5.2 桌面运行机制
 ```
-用户双击                    PyWebView              Gradio 后端
-LearnEverything.exe  ──>   launcher.py 主进程  ──>  custom_app.py 子进程
+用户双击                    PyWebView              FastAPI 后端
+LearnEverything.exe  ──>   launcher.py 主进程  ──>  uvicorn api.main:app
 (原生 Win 窗口)            (调度+窗口)             (Kotaemon venv python)
                             │                        │
                             │ subprocess.Popen        │ demo.launch()
@@ -228,7 +225,6 @@ LearnEverything.exe  ──>   launcher.py 主进程  ──>  custom_app.py 子
 ```
 
 **为什么双进程而非线程**：
-- Gradio/uvicorn 的信号处理与 PyWebView 冲突
 - 子进程隔离，崩溃不影响窗口
 - launcher.exe (PyInstaller) 和 Kotaemon venv 的 python 解耦，各自升级
 
@@ -253,17 +249,14 @@ LearnEverything.exe  ──>   launcher.py 主进程  ──>  custom_app.py 子
 **核心关系**：`User → Project → KnowledgeNode → {Card, Quiz, Task}`，
 掌握度 `mastery` 横跨 `测验正确率 + FSRS稳定性 + 状态进度` 三信号加权。
 
-## 7. Kotaemon 关键扩展点 (备忘)
+## 7. Kotaemon 基础设施 (只读)
 
 | 扩展点 | 位置 | 用途 |
 |---|---|---|
-| `App.ui()` | `ktem/main.py` | **插入新 Tab** ← 我们用了这个 |
-| `BasePage` | `ktem/app.py` | 编写 Tab 页面基类 |
 | `KH_REASONINGS` | `flowsettings.py` | 注册新 reasoning pipeline |
 | `ktem.llms.manager.llms` | `ktem/llms/manager.py` | 获取已配置 LLM |
 | `ktem.db.engine.engine` | `ktem/db/engine.py` | 共享 DB engine |
 | `IndexManager` | `ktem/index/` | 文档集合/RAG |
-| 事件系统 | `subscribe_event` | 跨 Tab 通信 |
 
 ## 8. 阶段路线图
 
@@ -281,6 +274,6 @@ LearnEverything.exe  ──>   launcher.py 主进程  ──>  custom_app.py 子
 - **依赖注入**：所有 service 函数第一个参数是 `session: Session`，便于测试
 - **LLM 调用**：统一走 `learning_ext.llm.chat/chat_json`，不直接碰 ktem
 - **提示词**：复杂提示词放各模块 `prompts.py`，不混在业务代码里
-- **新增浏览器功能**：在 `api/` 增加契约，在 `frontend/` 实现界面；`learning_ext/pages/` 仅用于 Gradio 兼容入口
+- **新增浏览器功能**：在 `api/` 增加契约，在 `frontend/` 实现界面
 - **数据迁移**：当前用 `SQLModel.metadata.create_all` 自动建表；量大后引入 Alembic
-- **打包**：改完 launcher.py 需重新 `build_exe.bat`；改 learning_ext 或 custom_app.py 不用重打（venv 内直接生效）
+- **打包**：改完 launcher.py 需重新 `build_exe.bat`；改 learning_ext 或 api 代码无需重打（便携版重新组装即可）

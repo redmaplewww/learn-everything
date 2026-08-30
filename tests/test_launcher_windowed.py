@@ -31,23 +31,6 @@ def test_pause_before_exit_skips_missing_standard_input(monkeypatch):
     prompt.assert_not_called()
 
 
-def test_backend_disables_unsupported_user_management(monkeypatch):
-    captured = {}
-    process = MagicMock(stdout=[])
-
-    def fake_popen(*args, **kwargs):
-        captured["env"] = kwargs["env"]
-        return process
-
-    monkeypatch.setattr(launcher.subprocess, "Popen", fake_popen)
-
-    launcher.start_gradio_backend(7860)
-
-    assert captured["env"]["KH_FEATURE_USER_MANAGEMENT"] == "0"
-    assert captured["env"]["PYTHONUTF8"] == "1"
-    assert captured["env"]["PYTHONIOENCODING"] == "utf-8"
-
-
 def test_api_backend_uses_fastapi_entrypoint_and_source_paths(monkeypatch):
     captured = {}
     process = MagicMock(stdout=[])

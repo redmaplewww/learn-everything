@@ -30,7 +30,6 @@ mkdir "%PORTABLE%\kotaemon"
 xcopy /E /I /Y "dist\LearnEverything\*" "%PORTABLE%\" >nul
 
 echo [3/5] 复制学习 Agent 代码...
-copy /Y custom_app.py "%PORTABLE%\" >nul
 xcopy /E /I /Y api "%PORTABLE%\api" >nul
 xcopy /E /I /Y learning_ext "%PORTABLE%\learning_ext" >nul
 if exist "frontend\out" xcopy /E /I /Y frontend\out "%PORTABLE%\frontend\out" >nul

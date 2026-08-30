@@ -10,7 +10,7 @@
 
 当前前端没有引入 Tailwind CSS、CSS Modules、组件库、全局状态库、数据请求库或前端路由库。样式由一份原生 CSS 文件维护，状态与副作用主要依赖 React Hooks，HTTP 与 SSE 通信直接使用浏览器 Fetch API。
 
-旧的 Gradio UI 尚未删除，但已不是默认入口。只有显式设置 `LE_UI=gradio` 时，启动器才会运行 `custom_app.py` 和 `learning_ext/pages/` 中的 Gradio 页面。
+旧的 Gradio UI 已从项目侧移除，启动器不再提供 `LE_UI` 回退模式。
 
 ## 2. 现行主栈
 
@@ -98,16 +98,14 @@ PyWebView 只是桌面窗口容器，不参与 React 渲染、状态管理或 AP
 
 组件没有依赖 shadcn/ui、MUI、Ant Design 等设计系统。按钮、表单、状态卡片和 Tab 都由原生 HTML + CSS 实现。
 
-## 7. Gradio 兼容栈
+## 7. 已移除的 Gradio 栈
 
-仓库仍保留完整的 Kotaemon/Gradio UI：
+项目侧不再保留 Kotaemon/Gradio UI：
 
-- `custom_app.py` 构建 `LearningApp` 并启动 Gradio；
-- `learning_ext/pages/` 下的页面继承 Kotaemon `BasePage`；
-- `learning_ext/assets/word_lookup.js` 会注入 Gradio 初始模板；
-- 设置 `LE_UI=gradio` 后，启动器改用 `7860` 端口运行该界面。
+- `custom_app.py`、`learning_ext/app.py` 和 `learning_ext/pages/` 已删除；
+- `launcher.py` 只启动 FastAPI，并由其托管 Next.js 静态资源。
 
-因此准确描述应是：**Next.js/React 是当前默认前端，Gradio 是仍可运行的兼容回退前端**，两者共享 `learning_ext` 业务能力，但入口与交互实现不同。
+因此当前架构只有 **Next.js/React + FastAPI** 一套前后端入口。
 
 ## 8. 明确未使用的技术
 
@@ -126,7 +124,7 @@ PyWebView 只是桌面窗口容器，不参与 React 渲染、状态管理或 AP
 
 ## 9. 现状判断与风险
 
-1. **迁移已提前发生，架构文档滞后。** `docs/ARCHITECTURE.md` 仍把 Next.js 独立前端列为阶段 5，并主要描述 Gradio 链路；实际默认启动链路已经是 Next.js + FastAPI。
+1. **迁移已完成。** 当前架构文档和启动链路均以 Next.js + FastAPI 为准。
 2. **前端测试与质量脚本缺失。** `package.json` 只有开发、构建、启动和类型检查脚本，没有 lint 或前端测试命令。
 3. **组合根偏重。** `app/page.tsx` 已达到 537 行，继续扩展时会增加状态耦合和回归范围；现有 `features/` 拆分方向是合理的。
 4. **API 类型手工同步。** DTO 与后端 schema 没有自动生成关系，接口演进时存在前后端类型漂移风险。

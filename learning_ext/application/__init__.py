@@ -1,6 +1,6 @@
 """客户端无关的学习应用用例。
 
-该包只组合学习领域 service 和持久化查询，不依赖 Gradio、FastAPI 或前端类型。
+该包只组合学习领域 service 和持久化查询，不依赖 FastAPI 或前端类型。
 """
 
 from learning_ext.application.projects import (

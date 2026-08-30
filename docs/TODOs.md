@@ -2,7 +2,7 @@
 
 > 更新日期：2026-08-30。本文是项目唯一的当前 TODO 文档。
 > 组织方式：按用户可感知的 Feature 管理；每个 Feature 同时包含后端、API、前端和验收。
-> 当前范围：浏览器前端、FastAPI、application、项目侧 service，以及桌面 exe/便携版/PyWebView 交付链路；Gradio 保留为回退入口。
+> 当前范围：Next.js 浏览器前端、FastAPI、application、项目侧 service，以及桌面 exe/便携版/PyWebView 交付链路。
 
 ## 当前运行基线
 
@@ -21,7 +21,6 @@
 #### 已完成
 
 - [x] 项目列表、项目选择、路线读取、路线预览、路线调整和项目保存已接入 application、API 和 Next.js。
-- [x] Gradio 路线页继续调用相同 application，用作回退和对照。
 - [x] 将学习工作区改为功能标签页：按学习概览、学习路线、到期复习、RAG 问答、查漏测验、模型配置排序；RAG 问答合并资料库与资料问答。学习路线在节点列表与节点详情间分层切换，不在同一页面同时显示。
   - 实际修改：`frontend/app/page.tsx` 将顶栏收敛为六项；“学习路线”使用列表/详情两级状态，进入节点后只渲染 `LESSON DETAIL` 与“返回学习路线”，跨标签保留详情状态；RAG 问答中并列资料库和资料问答组件。`frontend/app/styles.css` 将标签栏改为六列并增加详情返回区；中等宽度下节点状态控件移至正文下方，避免挤压节点标题和说明。
   - 自动验证：前端 `npm run typecheck` 通过。
@@ -138,7 +137,7 @@
 #### 非目标
 
 - 不在本 Feature 中重设计业务流程、API 契约或视觉风格。
-- 不因拆分移除 Gradio 回退入口或修改 Kotaemon 底座。
+- 不修改 Kotaemon 底座。
 
 ### Feature 9：桌面 exe 与便携版交付
 
@@ -163,7 +162,6 @@
 
 - [ ] 先完成 Feature 1/2 的 Rust 项目真实浏览器验收，再完成 Feature 3/5。
 - [ ] 每个当前主 Feature 的后端、API、前端、业务流程和测试一起验收，不以单独接口通过作为完成。
-- [ ] 所有日常流程完成真实验收、依赖扫描和回退确认前，不删除 Gradio Page 或启动链。
 
 ## 暂时挂起的 Feature
 
@@ -239,7 +237,7 @@
 
 ## 其他暂停范围
 
-- [ ] Gradio 移除：等待所有 Feature 完成最终对照回归，并再次取得删除确认。
+- [x] Gradio 移除：统一使用 Next.js + FastAPI 入口。
 
 ## 已知风险
 

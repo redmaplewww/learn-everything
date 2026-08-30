@@ -62,7 +62,7 @@ echo   产物: dist\LearnEverything\LearnEverything.exe
 echo.
 echo   便携版组装:
 echo     1. 复制 dist\LearnEverything\ 下的所有文件到分发目录
-echo     2. 把 api\、custom_app.py、learning_ext\、frontend\out\、kotaemon\.venv\ 一并复制
+echo     2. 把 api\、learning_ext\、frontend\out\、kotaemon\.venv\ 一并复制
 echo     3. 双击 LearnEverything.exe 即可运行
 echo ============================================================
 exit /b 0

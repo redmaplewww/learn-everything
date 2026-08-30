@@ -33,7 +33,7 @@ flowchart LR
     Learning --> Data[(项目与学习数据)]
 ```
 
-PyWebView 只作为桌面窗口容器，不参与 React 渲染、前端状态管理或 API 通信。Gradio 仍是独立的兼容入口，与 Next.js 工作台共享后端业务能力，但不属于本目录的页面组合方式。
+PyWebView 只作为桌面窗口容器，不参与 React 渲染、前端状态管理或 API 通信。
 
 ## 目录结构
 
@@ -205,10 +205,9 @@ flowchart LR
 
 ## 前端与兼容入口的关系
 
-Next.js 工作台和 Gradio 页面是两个独立的前端入口：
+Next.js 工作台是唯一的前端入口：
 
 - Next.js 入口提供当前默认的单页学习工作台；
-- Gradio 入口保留旧的兼容交互；
 - 两者共享后端学习能力和数据，但不共享 React 组件、页面状态或路由；
 - `frontend/` 下的模块化架构只描述 Next.js 工作台。
 

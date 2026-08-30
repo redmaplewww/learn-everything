@@ -30,7 +30,7 @@ def build_dashboard(
     *,
     user_id: str = "default",
 ) -> Dashboard:
-    """读取看板数据，不构造 Gradio 或 Plot 对象。"""
+    """读取看板数据，不构造前端展示对象。"""
     if project_id is not None:
         _get_project(session, project_id, user_id)
     data = build_dashboard_data(session, user_id=user_id, project_id=project_id)

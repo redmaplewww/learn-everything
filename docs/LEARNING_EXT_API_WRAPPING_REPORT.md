@@ -1,5 +1,7 @@
 # `learning_ext` 核心逻辑与 API 包装深度探索报告
 
+> 历史设计分析：本文记录迁移前的 Gradio 耦合情况。当前项目侧 Gradio 入口和页面已删除，运行方式以 Next.js + FastAPI 为准；`kotaemon/` 底座保持不变。
+
 > 状态：源码探索完成，尚未实施 API 改造
 > 日期：2026-08-24
 > 对齐文档：`docs/ARCHITECTURE.md`、`docs/FRONTEND_MIGRATION_PLAN.md`
