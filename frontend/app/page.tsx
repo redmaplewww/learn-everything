@@ -6,10 +6,13 @@ import {
   ArrowRight,
   BookOpenCheck,
   CheckCircle2,
+  Pencil,
   Plus,
   LoaderCircle,
   RefreshCw,
   RotateCcw,
+  Trash2,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -25,13 +28,18 @@ import {
   getDueCards,
   generateQuiz,
   getDashboard,
+  getProject,
   listProjects,
   saveNodeNote,
   submitReview,
   submitQuizAnswer,
+  updateProject,
   updateNodeStatus,
+  deleteProject,
   type ProjectRoadmap,
   type ProjectSummary,
+  type Project,
+  type ProjectUpdate,
   type ProjectWorkspace,
   type NodeDetail,
   type WorkspaceNode,
@@ -86,6 +94,8 @@ function ProjectList({
   onSelect,
   onRetry,
   onCreate,
+  onEdit,
+  onDelete,
 }: {
   projects: ProjectSummary[];
   selectedId: number | null;
@@ -94,6 +104,8 @@ function ProjectList({
   onSelect: (projectId: number) => void;
   onRetry: () => void;
   onCreate: () => void;
+  onEdit: (projectId: number) => void;
+  onDelete: (project: ProjectSummary) => void;
 }) {
   return (
     <aside className="project-rail" aria-label="项目列表">
@@ -122,24 +134,80 @@ function ProjectList({
       <nav className="project-list">
         {projects.map((project) => {
           const isSelected = project.id === selectedId;
-          return (
-            <button
-              key={project.id}
-              type="button"
-              className={`project-item ${isSelected ? "selected" : ""}`}
-              onClick={() => onSelect(project.id)}
-              aria-current={isSelected ? "page" : undefined}
-            >
+          return <article key={project.id} className={`project-item ${isSelected ? "selected" : ""}`}>
+            <button type="button" className="project-select" onClick={() => onSelect(project.id)} aria-current={isSelected ? "page" : undefined}>
               <span className="project-title">{project.title}</span>
               <span className="project-topic">{project.topic}</span>
               <span className="project-metric">{project.progress.done}/{project.progress.total} 已完成</span>
             </button>
-          );
+            <div className="project-actions">
+              <button type="button" className="project-action" title={`编辑 ${project.title}`} onClick={() => onEdit(project.id)}><Pencil size={14} /><span className="sr-only">编辑 {project.title}</span></button>
+              <button type="button" className="project-action danger" title={`删除 ${project.title}`} onClick={() => onDelete(project)}><Trash2 size={14} /><span className="sr-only">删除 {project.title}</span></button>
+            </div>
+          </article>;
         })}
       </nav>
       <button className="new-project-button" type="button" onClick={onCreate}><Plus size={17} />新建学习路线</button>
     </aside>
   );
+}
+
+function ProjectEditDialog({
+  project,
+  saving,
+  error,
+  onClose,
+  onSave,
+}: {
+  project: Project;
+  saving: boolean;
+  error: string | null;
+  onClose: () => void;
+  onSave: (payload: ProjectUpdate) => void;
+}) {
+  const [title, setTitle] = useState(project.title);
+  const [topic, setTopic] = useState(project.topic);
+  const [background, setBackground] = useState(project.background);
+  const [goal, setGoal] = useState(project.goal);
+  const [weeklyHours, setWeeklyHours] = useState(project.weekly_hours);
+  return <div className="project-dialog-backdrop" role="presentation">
+    <form className="project-dialog" role="dialog" aria-modal="true" aria-labelledby="project-edit-title" onSubmit={(event) => { event.preventDefault(); onSave({ title, topic, background, goal, weekly_hours: weeklyHours }); }}>
+      <div className="project-dialog-heading"><div><p className="eyebrow">PROJECT SETTINGS</p><h2 id="project-edit-title">编辑学习项目</h2></div><button type="button" className="icon-button" title="关闭" onClick={onClose} disabled={saving}><X size={18} /></button></div>
+      <p className="project-dialog-hint">修改主题不会重新生成当前学习路线；需要变更路线时，请新建学习路线。</p>
+      <label>项目名称<input value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={300} disabled={saving} /></label>
+      <label>学习主题<input value={topic} onChange={(event) => setTopic(event.target.value)} required maxLength={300} disabled={saving} /></label>
+      <label>学习背景<textarea value={background} onChange={(event) => setBackground(event.target.value)} maxLength={4000} rows={3} disabled={saving} /></label>
+      <label>学习目标<textarea value={goal} onChange={(event) => setGoal(event.target.value)} maxLength={4000} rows={3} disabled={saving} /></label>
+      <label>每周投入时间<span className="hour-input"><input type="number" min="1" max="168" value={weeklyHours} onChange={(event) => setWeeklyHours(Number(event.target.value))} required disabled={saving} />小时</span></label>
+      {error && <p className="project-dialog-error" role="alert">{error}</p>}
+      <div className="project-dialog-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={saving}>取消</button><button type="submit" className="command-button" disabled={saving}>{saving && <LoaderCircle className="spin" size={16} />}保存修改</button></div>
+    </form>
+  </div>;
+}
+
+function ProjectDeletionDialog({
+  project,
+  deleting,
+  error,
+  onClose,
+  onConfirm,
+}: {
+  project: ProjectSummary;
+  deleting: boolean;
+  error: string | null;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  const [confirmation, setConfirmation] = useState("");
+  return <div className="project-dialog-backdrop" role="presentation">
+    <section className="project-dialog project-delete-dialog" role="dialog" aria-modal="true" aria-labelledby="project-delete-title">
+      <div className="project-dialog-heading"><div><p className="eyebrow">DELETE PROJECT</p><h2 id="project-delete-title">删除“{project.title}”</h2></div><button type="button" className="icon-button" title="关闭" onClick={onClose} disabled={deleting}><X size={18} /></button></div>
+      <p>这会永久删除该项目的路线、知识点、学习笔记、参考资料、卡片、复习记录、测验和进度记录。</p>
+      <label>输入 <strong>DELETE</strong> 确认<input value={confirmation} onChange={(event) => setConfirmation(event.target.value)} autoComplete="off" disabled={deleting} /></label>
+      {error && <p className="project-dialog-error" role="alert">{error}</p>}
+      <div className="project-dialog-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={deleting}>取消</button><button type="button" className="danger-button" onClick={onConfirm} disabled={confirmation !== "DELETE" || deleting}>{deleting && <LoaderCircle className="spin" size={16} />}永久删除</button></div>
+    </section>
+  </div>;
 }
 
 type StatusNode = Pick<WorkspaceNode, "id" | "title" | "status">;
@@ -493,6 +561,10 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
   const [statusPendingId, setStatusPendingId] = useState<number | null>(null);
   const [view, setView] = useState<"workspace" | "create">("workspace");
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [deletingProject, setDeletingProject] = useState<ProjectSummary | null>(null);
+  const [projectAction, setProjectAction] = useState<"saving" | "deleting" | null>(null);
+  const [projectActionError, setProjectActionError] = useState<string | null>(null);
 
   const loadWorkspace = useCallback(async (projectId: number) => {
     setWorkspaceState("loading");
@@ -551,6 +623,46 @@ export default function HomePage() {
     void loadProjects(projectId);
   };
 
+  const openProjectEditor = async (projectId: number) => {
+    setProjectActionError(null);
+    try {
+      setEditingProject(workspace?.project.id === projectId ? workspace.project : await getProject(projectId));
+    } catch (loadError) {
+      setError(formatError(loadError));
+    }
+  };
+
+  const saveProject = async (payload: ProjectUpdate) => {
+    if (!editingProject) return;
+    setProjectAction("saving");
+    setProjectActionError(null);
+    try {
+      await updateProject(editingProject.id, payload);
+      const projectId = editingProject.id;
+      setEditingProject(null);
+      await loadProjects(projectId);
+    } catch (saveError) {
+      setProjectActionError(formatError(saveError));
+    } finally {
+      setProjectAction(null);
+    }
+  };
+
+  const confirmProjectDeletion = async () => {
+    if (!deletingProject) return;
+    setProjectAction("deleting");
+    setProjectActionError(null);
+    try {
+      await deleteProject(deletingProject.id, "DELETE");
+      setDeletingProject(null);
+      await loadProjects();
+    } catch (deleteError) {
+      setProjectActionError(formatError(deleteError));
+    } finally {
+      setProjectAction(null);
+    }
+  };
+
   const changeNodeStatus = async (node: StatusNode, status: string) => {
     if (!workspace || status === node.status) return true;
     const priorWorkspace = workspace;
@@ -580,8 +692,10 @@ export default function HomePage() {
 
   return (
     <div className="app-shell">
-      <ProjectList projects={projects} selectedId={view === "workspace" ? selectedId : null} state={projectState} error={error} onSelect={chooseProject} onRetry={() => void loadProjects()} onCreate={() => setView("create")} />
+      <ProjectList projects={projects} selectedId={view === "workspace" ? selectedId : null} state={projectState} error={error} onSelect={chooseProject} onRetry={() => void loadProjects()} onCreate={() => setView("create")} onEdit={(projectId) => void openProjectEditor(projectId)} onDelete={(project) => { setProjectActionError(null); setDeletingProject(project); }} />
       {view === "create" ? <RoadmapCreation onCreated={showCreatedProject} /> : <Workspace key={selectedId ?? "empty"} workspace={workspace} roadmap={roadmap} state={workspaceState} error={error} statusPendingId={statusPendingId} onRetry={() => selectedId && void loadWorkspace(selectedId)} onUpdateStatus={changeNodeStatus} />}
+      {editingProject && <ProjectEditDialog key={`edit-${editingProject.id}`} project={editingProject} saving={projectAction === "saving"} error={projectActionError} onClose={() => { setEditingProject(null); setProjectActionError(null); }} onSave={(payload) => void saveProject(payload)} />}
+      {deletingProject && <ProjectDeletionDialog key={`delete-${deletingProject.id}`} project={deletingProject} deleting={projectAction === "deleting"} error={projectActionError} onClose={() => { setDeletingProject(null); setProjectActionError(null); }} onConfirm={() => void confirmProjectDeletion()} />}
     </div>
   );
 }

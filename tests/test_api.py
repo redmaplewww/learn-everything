@@ -52,6 +52,44 @@ def test_list_projects_returns_application_order(session):
     assert [item["title"] for item in response.json()] == ["新项目", "旧项目"]
 
 
+def test_project_crud_updates_metadata_and_deletes_cascaded_data(sample_project, session):
+    client = api_client(session)
+
+    read = client.get(f"/api/v1/projects/{sample_project.id}")
+    assert read.status_code == 200
+    assert read.json()["title"] == sample_project.title
+
+    updated = client.patch(
+        f"/api/v1/projects/{sample_project.id}",
+        json={
+            "title": "已编辑项目",
+            "topic": "已编辑主题",
+            "background": "已有 Rust 基础",
+            "goal": "掌握异步编程",
+            "weekly_hours": 8,
+        },
+    )
+    assert updated.status_code == 200
+    assert updated.json()["title"] == "已编辑项目"
+    assert session.get(LearningProject, sample_project.id).topic == "已编辑主题"
+
+    rejected = client.request(
+        "DELETE",
+        f"/api/v1/projects/{sample_project.id}",
+        json={"confirmation_phrase": "delete"},
+    )
+    assert rejected.status_code == 400
+
+    deleted = client.request(
+        "DELETE",
+        f"/api/v1/projects/{sample_project.id}",
+        json={"confirmation_phrase": "DELETE"},
+    )
+    assert deleted.status_code == 200
+    assert deleted.json()["deleted"]["projects"] == 1
+    assert session.get(LearningProject, sample_project.id) is None
+
+
 def test_api_assigns_and_propagates_request_id(session, caplog):
     client = api_client(session)
     caplog.set_level("INFO", logger="uvicorn.error")

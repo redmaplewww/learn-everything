@@ -12,7 +12,10 @@ from learning_ext.application.projects import (
     ProjectWorkspace,
     WorkspaceNode,
     get_project_workspace,
+    get_project,
     list_projects,
+    update_project,
+    delete_project,
     update_node_status,
 )
 from learning_ext.application.roadmap import (
@@ -133,6 +136,7 @@ __all__ = [
     "ModelProfileSummary",
     "WorkspaceNode",
     "create_project",
+    "delete_project",
     "delete_node_resource",
     "audit_node_content",
     "audit_project_roadmap",
@@ -149,6 +153,7 @@ __all__ = [
     "generate_node_resources",
     "generate_practice_lesson",
     "get_project_roadmap",
+    "get_project",
     "get_project_workspace",
     "get_resource_deletion_preview",
     "get_resource_index_status",
@@ -164,4 +169,5 @@ __all__ = [
     "shutdown_content_preparation_jobs",
     "replace_project_roadmap",
     "update_node_status",
+    "update_project",
 ]

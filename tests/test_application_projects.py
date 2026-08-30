@@ -39,7 +39,7 @@ from learning_ext.application import (
     review_fsrs_card,
     submit_quiz_answer,
 )
-from learning_ext.db.models import Card, KnowledgeNode, NodeNote, NodeResource, Task
+from learning_ext.db.models import Card, KnowledgeNode, LearningProject, NodeNote, NodeResource, Task
 
 
 def test_list_projects_is_sorted_and_returns_structured_summary(session):
@@ -64,6 +64,44 @@ def test_list_projects_keeps_user_boundary(session):
     session.commit()
 
     assert list_projects(session) == []
+
+
+def test_update_project_changes_metadata_without_rewriting_roadmap(sample_project, session):
+    from learning_ext.application import update_project
+
+    original_roadmap = sample_project.roadmap_json
+    updated = update_project(
+        session,
+        sample_project.id,
+        "新的项目名称",
+        "新的学习主题",
+        "已有基础",
+        "完成一个实战项目",
+        12,
+    )
+
+    session.expire_all()
+    stored = session.get(LearningProject, sample_project.id)
+    assert updated["title"] == "新的项目名称"
+    assert stored.topic == "新的学习主题"
+    assert stored.background == "已有基础"
+    assert stored.goal == "完成一个实战项目"
+    assert stored.weekly_hours == 12
+    assert stored.roadmap_json == original_roadmap
+
+
+def test_delete_project_requires_confirmation_and_respects_user_boundary(sample_project, session):
+    from learning_ext.application import ProjectNotFoundError, delete_project
+
+    with pytest.raises(ValueError, match="DELETE"):
+        delete_project(session, sample_project.id, "delete")
+    with pytest.raises(ProjectNotFoundError):
+        delete_project(session, sample_project.id, "DELETE", user_id="other")
+
+    deleted = delete_project(session, sample_project.id, "DELETE")
+
+    assert deleted["deleted"]["projects"] == 1
+    assert session.get(LearningProject, sample_project.id) is None
 
 
 def test_get_project_roadmap_contains_node_ids(sample_project, session):

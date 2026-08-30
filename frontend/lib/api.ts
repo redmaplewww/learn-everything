@@ -17,6 +17,10 @@ export type ProjectSummary = {
   created_at: string;
 };
 
+export type Project = ProjectWorkspace["project"];
+export type ProjectUpdate = Omit<Project, "id" | "status" | "created_at" | "updated_at">;
+export type ProjectDeletion = { project_id: number; deleted: Record<string, number> };
+
 export type RoadmapNode = {
   id: number | null;
   code: string;
@@ -171,6 +175,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const listProjects = () => request<ProjectSummary[]>("/projects");
+export const getProject = (projectId: number) => request<Project>(`/projects/${projectId}`);
+export const updateProject = (projectId: number, payload: ProjectUpdate) => request<Project>(`/projects/${projectId}`, { method: "PATCH", body: JSON.stringify(payload) });
+export const deleteProject = (projectId: number, confirmation_phrase: string) => request<ProjectDeletion>(`/projects/${projectId}`, { method: "DELETE", body: JSON.stringify({ confirmation_phrase }) });
 export const getProjectRoadmap = (projectId: number) => request<ProjectRoadmap>(`/projects/${projectId}/roadmap`);
 export const getProjectWorkspace = (projectId: number) => request<ProjectWorkspace>(`/projects/${projectId}/workspace`);
 export const updateNodeStatus = (nodeId: number, status: string) => request<NodeStatusUpdate>(`/nodes/${nodeId}/status`, {

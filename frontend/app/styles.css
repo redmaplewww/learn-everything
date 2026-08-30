@@ -33,9 +33,13 @@ h1 { margin-bottom: 0; font-size: 30px; line-height: 1.1; }
 .project-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; margin-top: 20px; }
 .new-project-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: 100%; margin-top: 18px; padding: 11px 12px; color: var(--ink); background: var(--lime); border: 0; border-radius: 3px; cursor: pointer; font-weight: 800; }
 .new-project-button:hover { background: #d0e887; }
-.project-item { min-width: 0; width: 100%; padding: 15px 13px; color: inherit; text-align: left; background: transparent; border: 1px solid transparent; border-radius: 4px; cursor: pointer; transition: background 160ms ease, border-color 160ms ease, transform 160ms ease; }
+.project-item { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; min-width: 0; width: 100%; color: inherit; background: transparent; border: 1px solid transparent; border-radius: 4px; transition: background 160ms ease, border-color 160ms ease, transform 160ms ease; }
 .project-item:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); transform: translateX(2px); }
 .project-item.selected { color: var(--ink); background: var(--lime); border-color: var(--lime); }
+.project-select { min-width: 0; padding: 15px 7px 15px 13px; color: inherit; text-align: left; background: transparent; border: 0; cursor: pointer; }
+.project-actions { display: flex; align-items: start; gap: 2px; padding: 11px 7px 0 0; }
+.project-action { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; color: currentColor; background: transparent; border: 0; border-radius: 3px; cursor: pointer; opacity: 0.68; }
+.project-action:hover { background: rgba(255,255,255,0.28); opacity: 1; }.project-action.danger:hover { color: #8e392b; background: #fff0ed; }
 .project-title, .project-topic, .project-metric { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-title { font-weight: 800; }
 .project-topic { margin-top: 5px; opacity: 0.77; font-size: 13px; }
@@ -220,6 +224,11 @@ h1 { margin-bottom: 0; font-size: 30px; line-height: 1.1; }
 .job-blocked { color: #7c5315; background: #ffedbf; border-color: var(--amber); }
 .command-button { display: inline-flex; justify-content: center; align-items: center; gap: 8px; width: fit-content; margin: 8px auto 0; padding: 10px 13px; color: #fff; background: var(--forest); border: 0; border-radius: 3px; cursor: pointer; font-weight: 800; }
 .command-button:hover { background: #134834; }
+.project-dialog-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(27, 41, 35, 0.48); }
+.project-dialog { display: grid; gap: 14px; width: min(560px, 100%); max-height: calc(100vh - 48px); overflow: auto; padding: 25px; color: var(--ink); background: var(--paper); border: 1px solid var(--line); border-top: 5px solid var(--forest); box-shadow: 0 24px 80px rgba(20, 41, 31, 0.24); }
+.project-dialog-heading { display: flex; align-items: start; justify-content: space-between; gap: 20px; }.project-dialog-heading h2 { margin: 0; font-size: 29px; }.project-dialog-heading .icon-button { flex: 0 0 34px; width: 34px; height: 34px; }
+.project-dialog > label { display: grid; gap: 6px; color: var(--ink); font-size: 13px; font-weight: 800; }.project-dialog input, .project-dialog textarea { width: 100%; padding: 10px 11px; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 3px; font: inherit; font-weight: 400; line-height: 1.5; }.project-dialog textarea { resize: vertical; }.project-dialog input:focus, .project-dialog textarea:focus { border-color: var(--forest); outline: 2px solid rgba(31, 92, 69, 0.2); }
+.project-dialog-hint, .project-delete-dialog > p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.65; }.project-dialog-error { margin: 0; color: #8e392b; font-size: 13px; }.project-dialog-actions { display: flex; justify-content: end; gap: 8px; padding-top: 5px; }.project-dialog-actions .command-button { margin: 0; }.danger-button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 10px 13px; color: #fff; background: #a53e2d; border: 0; border-radius: 3px; cursor: pointer; font-weight: 800; }.danger-button:hover:not(:disabled) { background: #853021; }.danger-button:disabled { cursor: wait; opacity: 0.58; }
 .spin { animation: spin 850ms linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
@@ -235,7 +244,7 @@ h1 { margin-bottom: 0; font-size: 30px; line-height: 1.1; }
   .rail-title-row { padding-bottom: 16px; }
   h1 { font-size: 26px; }
   .project-list { display: flex; overflow-x: auto; margin-right: -18px; padding-right: 18px; }
-  .project-item { flex: 0 0 190px; }
+  .project-item { flex: 0 0 220px; }
   .new-project-button { margin-top: 12px; }
   .workspace { padding: 32px 18px 48px; }
   .workspace-header { align-items: start; flex-direction: column; gap: 20px; }

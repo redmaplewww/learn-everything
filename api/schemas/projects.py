@@ -122,6 +122,23 @@ class CreateProjectRequest(BaseModel):
     roadmap: dict[str, Any]
 
 
+class UpdateProjectRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=300)
+    topic: str = Field(min_length=1, max_length=300)
+    background: str = Field(default="", max_length=4_000)
+    goal: str = Field(default="", max_length=4_000)
+    weekly_hours: float = Field(gt=0, le=168)
+
+
+class DeleteProjectRequest(BaseModel):
+    confirmation_phrase: str = Field(min_length=1, max_length=20)
+
+
+class ProjectDeletionResponse(BaseModel):
+    project_id: int
+    deleted: dict[str, int]
+
+
 class CreateProjectResponse(BaseModel):
     project_id: int
     title: str

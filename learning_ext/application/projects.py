@@ -20,6 +20,7 @@ from learning_ext.progress.study import (
     set_node_status,
     sort_nodes_by_code,
 )
+from learning_ext.project_ops import delete_project as delete_project_data
 
 
 class ApplicationError(ValueError):
@@ -168,6 +169,47 @@ def get_project_workspace(
     )
 
 
+def get_project(session: Session, project_id: int, user_id: str = "default") -> dict[str, Any]:
+    return _project_payload(_get_project(session, project_id, user_id))
+
+
+def update_project(
+    session: Session,
+    project_id: int,
+    title: str,
+    topic: str,
+    background: str,
+    goal: str,
+    weekly_hours: float,
+    user_id: str = "default",
+) -> dict[str, Any]:
+    """更新项目元信息，不改写已保存的学习路线。"""
+    project = _get_project(session, project_id, user_id)
+    project.title = _project_text(title, "项目名称", 300)
+    project.topic = _project_text(topic, "选题", 300)
+    project.background = _optional_project_text(background, "学习背景", 4_000)
+    project.goal = _optional_project_text(goal, "学习目标", 4_000)
+    project.weekly_hours = _project_hours(weekly_hours)
+    project.updated_at = datetime.utcnow()
+    session.add(project)
+    session.commit()
+    session.refresh(project)
+    return _project_payload(project)
+
+
+def delete_project(
+    session: Session,
+    project_id: int,
+    confirmation_phrase: str,
+    user_id: str = "default",
+) -> dict[str, Any]:
+    """确认后级联删除当前用户的项目及其学习数据。"""
+    if confirmation_phrase != "DELETE":
+        raise ApplicationError("删除项目必须输入 DELETE 确认")
+    _get_project(session, project_id, user_id)
+    return delete_project_data(session, project_id)
+
+
 def update_node_status(
     session: Session,
     node_id: int,
@@ -267,6 +309,42 @@ def _node_payload(node: KnowledgeNode) -> dict[str, Any]:
         "est_hours": node.est_hours,
         "difficulty": node.difficulty,
     }
+
+
+def _project_payload(project: LearningProject) -> dict[str, Any]:
+    return {
+        "id": _required_id(project.id, "项目"),
+        "title": project.title,
+        "topic": project.topic,
+        "background": project.background,
+        "goal": project.goal,
+        "weekly_hours": project.weekly_hours,
+        "status": project.status,
+        "created_at": project.created_at,
+        "updated_at": project.updated_at,
+    }
+
+
+def _project_text(value: str, label: str, maximum: int) -> str:
+    normalized = value.strip()
+    if not normalized:
+        raise ApplicationError(f"{label}不能为空")
+    if len(normalized) > maximum:
+        raise ApplicationError(f"{label}不能超过 {maximum} 个字符")
+    return normalized
+
+
+def _optional_project_text(value: str, label: str, maximum: int) -> str:
+    normalized = value.strip()
+    if len(normalized) > maximum:
+        raise ApplicationError(f"{label}不能超过 {maximum} 个字符")
+    return normalized
+
+
+def _project_hours(value: float) -> float:
+    if not 0 < value <= 168:
+        raise ApplicationError("每周投入时间必须在 0 到 168 小时之间")
+    return value
 
 
 def _required_id(value: int | None, label: str) -> int:

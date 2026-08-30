@@ -9,10 +9,12 @@ kotaemon/.venv/
 frontend/.next/
 frontend/out/
 frontend/tsconfig.tsbuildinfo
+frontend/next-env.d.ts
 frontend/AGENTS.md
 frontend/CLAUDE.md
 .env
 kotaemon/.env
+kotaemon/.env.model-config.backup
 .tmp/
 .theflow/
 docs/diagrams/.$*.bkp

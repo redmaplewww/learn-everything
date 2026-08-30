@@ -9,19 +9,26 @@ from api.schemas.projects import (
     ContentPreparationResponse,
     CreateProjectRequest,
     CreateProjectResponse,
+    DeleteProjectRequest,
+    ProjectDeletionResponse,
     ProjectRoadmapResponse,
+    ProjectResponse,
     ProjectSummaryResponse,
     ProjectWorkspaceResponse,
+    UpdateProjectRequest,
 )
 from learning_ext.application import (
     cancel_content_preparation,
     create_project,
+    delete_project,
     get_content_preparation,
     get_project_roadmap,
+    get_project,
     get_project_workspace,
     list_projects,
     prepare_project_content,
     retry_content_preparation,
+    update_project,
 )
 
 router = APIRouter(prefix="/projects", tags=["projects"])
@@ -37,6 +44,29 @@ def create_project_route(
     payload: CreateProjectRequest, session: Session = Depends(get_session)
 ):
     return create_project(session, **payload.model_dump()).to_dict()
+
+
+@router.patch("/{project_id}", response_model=ProjectResponse)
+def update_project_route(
+    project_id: int,
+    payload: UpdateProjectRequest,
+    session: Session = Depends(get_session),
+):
+    return update_project(session, project_id, **payload.model_dump())
+
+
+@router.get("/{project_id}", response_model=ProjectResponse)
+def read_project(project_id: int, session: Session = Depends(get_session)):
+    return get_project(session, project_id)
+
+
+@router.delete("/{project_id}", response_model=ProjectDeletionResponse)
+def delete_project_route(
+    project_id: int,
+    payload: DeleteProjectRequest,
+    session: Session = Depends(get_session),
+):
+    return delete_project(session, project_id, **payload.model_dump())
 
 
 @router.get("/{project_id}/roadmap", response_model=ProjectRoadmapResponse)
