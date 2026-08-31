@@ -14,7 +14,6 @@ set PYINSTALLER=kotaemon\.venv\Scripts\pyinstaller.exe
 
 if not exist "%PYINSTALLER%" (
     echo [错误] 未找到 PyInstaller，请先运行 setup.bat
-    pause
     exit /b 1
 )
 
@@ -23,7 +22,18 @@ if exist build rmdir /s /q build
 if exist dist rmdir /s /q dist
 
 echo.
-echo [2/2] PyInstaller 打包中 (约 1-3 分钟)...
+echo [2/3] 构建 Next.js 静态前端...
+pushd frontend
+call npm run build
+if errorlevel 1 (
+    popd
+    echo [错误] Next.js 静态前端构建失败
+    exit /b 1
+)
+popd
+
+echo.
+echo [3/3] PyInstaller 打包中 (约 1-3 分钟)...
 "%PYINSTALLER%" ^
     --noconfirm ^
     --clean ^
@@ -33,6 +43,7 @@ echo [2/2] PyInstaller 打包中 (约 1-3 分钟)...
     --hidden-import "webview" ^
     --hidden-import "webview.platforms.edgechromium" ^
     --collect-submodules "webview" ^
+    --add-data "%CD%\frontend\out;frontend\out" ^
     --distpath dist ^
     --workpath build ^
     --specpath build ^
@@ -41,7 +52,6 @@ echo [2/2] PyInstaller 打包中 (约 1-3 分钟)...
 if errorlevel 1 (
     echo.
     echo [错误] 打包失败，请查看上方日志
-    pause
     exit /b 1
 )
 
@@ -52,7 +62,7 @@ echo   产物: dist\LearnEverything\LearnEverything.exe
 echo.
 echo   便携版组装:
 echo     1. 复制 dist\LearnEverything\ 下的所有文件到分发目录
-echo     2. 把 custom_app.py、learning_ext\、kotaemon\.venv\ 一并复制
+echo     2. 把 api\、learning_ext\、frontend\out\、kotaemon\.venv\ 一并复制
 echo     3. 双击 LearnEverything.exe 即可运行
 echo ============================================================
-pause
+exit /b 0

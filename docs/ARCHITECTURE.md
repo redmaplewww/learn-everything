@@ -1,11 +1,25 @@
 # 学习 Agent 架构文档
 
-> 版本：阶段 0 完成（已切换为 Windows 桌面 exe 方案）
-> 状态：本地运行 + exe 打包全部跑通，学习特化模块骨架就位
+> 当前运行基线：Next.js 浏览器前端 + FastAPI API。日常入口为 `start.bat`，访问 `http://127.0.0.1:3000`。PyWebView 仅作为可选桌面窗口容器。
 
-## 1. 总体架构
+## 1. 当前运行架构
 
+```text
+start.bat
+  -> scripts/start_frontend_dev.py
+     -> Next.js 开发服务器             http://127.0.0.1:3000
+     -> FastAPI API                    http://127.0.0.1:8000/api/v1/*
+          -> learning_ext.application 与领域服务
+               -> SQLModel / SQLite、FSRS、LLM facade、Kotaemon RAG 适配
 ```
+
+开发脚本会设置 `LEARNING_DEV_MODE=1`。因此 8000 在开发态不挂载 `frontend/out`，只提供 API；浏览器页面只能从 3000 获取。这样可避免构建产物落后于源码时出现旧 UI。
+
+构建或桌面打包前执行 `frontend` 目录内的 `npm run build`。此时 `launcher.py` 或打包 exe 启动 FastAPI，并从 `frontend/out` 在 `http://127.0.0.1:8000/` 提供静态页面。该路径用于构建产物，不替代开发入口。
+
+## 2. 桌面容器架构
+
+```text
 ┌──────────────────────────────────────────────────────────┐
 │           LearnEverything.exe (PyWebView 桌面窗口)        │
 │                  launcher.py (主进程)                     │
@@ -13,7 +27,7 @@
                          │ subprocess (Kotaemon venv python)
                          ▼
 ┌──────────────────────────────────────────────────────────┐
-│              custom_app.py (Gradio 后端)                  │
+│              api/main.py (FastAPI 后端)                  │
 │              http://127.0.0.1:7860                        │
 │  Kotaemon 原生 Tab          学习特化 Tab (新增)           │
 │  ┌──────┐┌──────┐   ┌─────────┐┌─────┐┌─────┐┌─────┐   │
@@ -42,6 +56,8 @@
               │ LLM Provider│ DeepSeek/GLM/OpenAI/Ollama
               └─────────────┘
 ```
+
+```text
 ┌──────────────────────────────────────────────────────────┐
 │                    浏览器 :7860                           │
 │  Kotaemon 原生 Tab          学习特化 Tab (新增)           │
@@ -73,35 +89,36 @@
               └─────────────┘
 ```
 
-## 2. 核心设计决策
+## 3. 核心设计决策
 
-### 2.1 为什么 fork Kotaemon 作底座
+### 3.1 为什么 fork Kotaemon 作底座
 Kotaemon (25.5k★) 已成熟实现：多用户登录、文档集合、混合 RAG(全文+向量+rerank)、
 PDF 引用高亮、ReAct/ReWOO Agent、GraphRAG、Docker 部署。**这些占学习 Agent 所需
 功能的 60%，复用可省去重写 RAG/文档/对话轮子。**
 
-### 2.2 学习特化模块解耦
+### 3.2 学习特化模块解耦
 `learning_ext/` 独立于 Kotaemon 代码树，只通过三个公共接口耦合：
 - `ktem.db.engine.engine` (共享 SQLite)
 - `ktem.llms.manager.llms` (共享 LLM 配置)
-- `ktem.app.BasePage` (Gradio Tab 基类)
 
-**好处**：阶段 5 可把 `learning_ext` 抽出为独立 FastAPI 服务，配 Next.js 前端，
-Kotaemon 降级为 RAG 微服务，迁移成本最小。
+**当前状态**：浏览器前端通过 FastAPI 调用 `learning_ext` 领域服务。Kotaemon 继续提供 SQLite、LLM 配置和 RAG 能力。
 
 ### 2.3 FSRS v6 而非 SM-2
 采用 [Free Spaced Repetition Scheduler](https://github.com/open-spaced-repetition)
 v6 算法 (pip 包 `fsrs`)，比 Anki 经典 SM-2 先进 30%+，是当前最强开源间隔重复算法。
 核心参数：`stability`(记忆稳定性)、`difficulty`(难度)、`state`(新/学习/复习/重学)。
 
-## 3. 目录结构
+## 4. 目录结构
 
 ```
 learn-everything/
-├── launcher.py               # 桌面启动器 (PyWebView + 子进程编排)
-├── custom_app.py             # 后端入口 (LearningApp，设置 sys.path/环境变量)
+├── start.bat                 # 推荐入口：启动 Next.js 与 FastAPI
+├── scripts/start_frontend_dev.py # 开发服务编排、端口检查、日志转发
+├── frontend/                 # Next.js 页面（开发态由 3000 提供）
+├── api/                      # FastAPI 路由与应用入口
+├── launcher.py               # 构建/桌面启动器 (PyWebView + 静态前端)
+├── api/main.py               # FastAPI 后端入口
 ├── setup.bat                 # 首次环境初始化 (uv + venv + 依赖)
-├── run.bat                   # 启动程序
 ├── build_exe.bat             # PyInstaller 打 launcher.exe
 ├── pack_portable.bat         # 组装完整便携版
 │
@@ -123,7 +140,6 @@ learn-everything/
 │   ├── feynman/              # 阶段4: 费曼/苏格拉底对话
 │   ├── practice/             # 阶段4: 环境/实操辅助
 │   ├── exporter/             # 阶段4: 导出 Anki/MD/PDF
-│   └── pages/                # Gradio Tab (路线Tab 已可用)
 │
 ├── kotaemon/ktem_app_data/   # 运行时数据 (gitignore)
 │   └── user_data/
@@ -135,11 +151,66 @@ learn-everything/
 └── docs/ARCHITECTURE.md      # 本文档
 ```
 
-## 4. 运行机制（双进程模型）
+## 5. 运行架构
+
+### 5.1 当前双前端共用业务核心
 
 ```
-用户双击                    PyWebView              Gradio 后端
-LearnEverything.exe  ──>   launcher.py 主进程  ──>  custom_app.py 子进程
+┌──────────────────────────────────── 表现层：两套前端 ────────────────────────────────────┐
+│                                                                                           │
+│  Next.js / React 前端                              FastAPI 静态服务                     │
+│  frontend/                                         api/main.py                           │
+│  浏览器开发 :3000；构建后可由 FastAPI 托管         统一提供 API 与静态资源               │
+└────────────────────────────┬───────────────────────────────────┬──────────────────────────┘
+                             │                                   │
+                             │ HTTP REST / SSE                   │
+                             ▼                                   ▼
+┌────────────────────────────────────┐      ┌────────────────────────────────────────────┐
+│ FastAPI HTTP 接入适配层             │      │ Next.js 页面                             │
+│                                    │      │                                            │
+│ api/main.py                         │      │ frontend/                                  │
+│ - 创建 FastAPI 应用                 │      │ - 创建 LearningApp                          │
+│ - 注册 /api/v1 路由                 │      │                                            │
+│ - 开发态 CORS、生产态静态托管        │      │ learning_ext/app.py                         │
+│                                    │      │ - LearningApp(KotaemonApp)                  │
+│ api/routers/*.py                    │      │ - init_learning_ext()                       │
+│ - HTTP 请求 / 响应编排              │      │ - _build_learning_tabs() 注册学习 Tab       │
+│                                    │      │                                            │
+│ api/schemas/*.py                    │      │ frontend/features/*.tsx                    │
+│ - 请求 DTO、响应 DTO                │      │ - PathGeneratorPage / ReviewPage 等         │
+│                                    │      │ - 绑定页面交互与 API 调用                  │
+│ api/dependencies.py                 │      │                                            │
+│ - Session、RAG Gateway 等依赖注入   │      │ 页面回调直接调用应用服务                     │
+└─────────────────────┬──────────────┘      └─────────────────────┬──────────────────────┘
+                      │                                           │
+                      │ DTO -> 应用服务调用                       │ 直接应用服务调用
+                      └───────────────────────┬───────────────────┘
+                                              ▼
+┌──────────────────────────── 共享业务核心：learning_ext/ ────────────────────────────────┐
+│                                                                                            │
+│ learning_ext/bootstrap.py                                                                  │
+│ - 两条启动路径均调用 init_learning_ext()，完成学习扩展初始化                               │
+│                                                                                            │
+│ learning_ext/application/*.py                                                              │
+│ - projects / roadmap / study / review / quiz / dashboard / resources / chat / jobs        │
+│ - 统一编排学习业务用例；service 函数以 session: Session 作为首个参数                       │
+│                                                                                            │
+│ learning_ext/ 领域模型、FSRS、LLM facade、Kotaemon RAG Adapter                            │
+└──────────────────────────────────────────────┬────────────────────────────────────────────┘
+                                               ▼
+┌──────────────────────────── Kotaemon 共享基础设施 ───────────────────────────────────────┐
+│ SQLite / SQLModel（le_* 表） · LLM 配置与调用 · 文档索引与 RAG · 外部 LLM Provider          │
+└────────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+两套前端共用的是 `learning_ext/` 业务核心及 Kotaemon 基础设施，接入方式不同：Next.js 通过
+`frontend/lib/api.ts` 调用 FastAPI 的 `/api/v1` 契约，页面组件直接使用
+`learning_ext/application/` 提供的应用服务。
+
+### 5.2 桌面运行机制
+```
+用户双击                    PyWebView              FastAPI 后端
+LearnEverything.exe  ──>   launcher.py 主进程  ──>  uvicorn api.main:app
 (原生 Win 窗口)            (调度+窗口)             (Kotaemon venv python)
                             │                        │
                             │ subprocess.Popen        │ demo.launch()
@@ -154,11 +225,10 @@ LearnEverything.exe  ──>   launcher.py 主进程  ──>  custom_app.py 子
 ```
 
 **为什么双进程而非线程**：
-- Gradio/uvicorn 的信号处理与 PyWebView 冲突
 - 子进程隔离，崩溃不影响窗口
 - launcher.exe (PyInstaller) 和 Kotaemon venv 的 python 解耦，各自升级
 
-## 5. 数据模型
+## 6. 数据模型
 
 全部复用 Kotaemon 的 SQLite engine，表名前缀 `le_` 避免冲突。
 
@@ -179,19 +249,16 @@ LearnEverything.exe  ──>   launcher.py 主进程  ──>  custom_app.py 子
 **核心关系**：`User → Project → KnowledgeNode → {Card, Quiz, Task}`，
 掌握度 `mastery` 横跨 `测验正确率 + FSRS稳定性 + 状态进度` 三信号加权。
 
-## 6. Kotaemon 关键扩展点 (备忘)
+## 7. Kotaemon 基础设施 (只读)
 
 | 扩展点 | 位置 | 用途 |
 |---|---|---|
-| `App.ui()` | `ktem/main.py` | **插入新 Tab** ← 我们用了这个 |
-| `BasePage` | `ktem/app.py` | 编写 Tab 页面基类 |
 | `KH_REASONINGS` | `flowsettings.py` | 注册新 reasoning pipeline |
 | `ktem.llms.manager.llms` | `ktem/llms/manager.py` | 获取已配置 LLM |
 | `ktem.db.engine.engine` | `ktem/db/engine.py` | 共享 DB engine |
 | `IndexManager` | `ktem/index/` | 文档集合/RAG |
-| 事件系统 | `subscribe_event` | 跨 Tab 通信 |
 
-## 7. 阶段路线图
+## 8. 阶段路线图
 
 | 阶段 | 内容 | 状态 |
 |---|---|---|
@@ -200,13 +267,13 @@ LearnEverything.exe  ──>   launcher.py 主进程  ──>  custom_app.py 子
 | **2 认知巩固** | FSRS 复习队列完整 UI、AI 卡片提炼 | ⏳ 待做 |
 | **3 查漏+看板** | 测验出题/批改、错题本、热力图、甘特图、AI 日报 | ⏳ 待做 |
 | **4 增强** | 费曼对话、苏格拉底、实操辅助、导出 | ⏳ 待做 |
-| **5 演进** | Kotaemon→RAG微服务、Next.js 独立前端 | ⏳ 待做 |
+| **5 演进** | 深化浏览器前端与 RAG 服务边界 | ⏳ 待做 |
 
-## 8. 开发约定
+## 9. 开发约定
 
 - **依赖注入**：所有 service 函数第一个参数是 `session: Session`，便于测试
 - **LLM 调用**：统一走 `learning_ext.llm.chat/chat_json`，不直接碰 ktem
 - **提示词**：复杂提示词放各模块 `prompts.py`，不混在业务代码里
-- **新增 Tab**：在 `learning_ext/pages/` 加 BasePage 子类，在 `app.py._build_learning_tabs` 注册
+- **新增浏览器功能**：在 `api/` 增加契约，在 `frontend/` 实现界面
 - **数据迁移**：当前用 `SQLModel.metadata.create_all` 自动建表；量大后引入 Alembic
-- **打包**：改完 launcher.py 需重新 `build_exe.bat`；改 learning_ext 或 custom_app.py 不用重打（venv 内直接生效）
+- **打包**：改完 launcher.py 需重新 `build_exe.bat`；改 learning_ext 或 api 代码无需重打（便携版重新组装即可）

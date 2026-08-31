@@ -57,15 +57,22 @@ def _load_config() -> dict:
     file_cfg = _parse_env_file()
     cfg = {
         "api_key": (
-            file_cfg.get("OPENAI_API_KEY") or os.environ.get("OPENAI_API_KEY", "")
+            file_cfg.get("LEARNING_LLM_API_KEY")
+            or file_cfg.get("OPENAI_API_KEY")
+            or os.environ.get("LEARNING_LLM_API_KEY", "")
+            or os.environ.get("OPENAI_API_KEY", "")
         ),
         "base_url": (
-            file_cfg.get("OPENAI_API_BASE")
+            file_cfg.get("LEARNING_LLM_API_BASE")
+            or file_cfg.get("OPENAI_API_BASE")
+            or os.environ.get("LEARNING_LLM_API_BASE", "")
             or os.environ.get("OPENAI_API_BASE", "")
             or "https://api.openai.com/v1"
         ),
         "chat_model": (
-            file_cfg.get("OPENAI_CHAT_MODEL")
+            file_cfg.get("LEARNING_LLM_MODEL")
+            or file_cfg.get("OPENAI_CHAT_MODEL")
+            or os.environ.get("LEARNING_LLM_MODEL", "")
             or os.environ.get("OPENAI_CHAT_MODEL", "")
             or "gpt-4o-mini"
         ),

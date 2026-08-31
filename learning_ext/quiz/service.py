@@ -31,13 +31,15 @@ SYSTEM = """你是一位严谨的命题专家。根据知识点信息出测验�
   "options": ["A. ...", "B. ...", "C. ...", "D. ..."],  // 仅 choice 有
   "answer": "标准答案 (choice 填字母如 'B'，fill/short 填文本，practice 填参考步骤)",
   "explanation": "解析说明",
-  "difficulty": 1-5
+  "difficulty": 1-5,
+  "node_id": 知识点 ID
 }
 规则：
 - choice 必须有 4 个选项，answer 填对应字母
 - fill 留空 options，answer 填标准答案
 - short 留空 options，answer 填要点式参考答案
 - practice 留空 options，answer 填参考操作步骤
+- node_id 必须填写本题对应的知识点 ID，只能使用输入知识点列表中的 ID
 - 只返回 JSON 数组，不要额外说明"""
 
 GRADE_SYSTEM = """你是阅卷老师。判断用户答案是否正确。
@@ -77,8 +79,11 @@ def generate_quiz(
         raise ValueError("未找到指定知识点")
 
     nodes_text = "\n".join(
-        f"- [{n.code}] {n.title} (难度{n.difficulty}): {n.description}" for n in nodes
+        f"- [ID={n.id}, {n.code}] {n.title} (难度{n.difficulty}): {n.description}" for n in nodes
     )
+    allowed_node_ids = {node.id for node in nodes}
+    if project_id is not None and any(node.project_id != project_id for node in nodes):
+        raise ValueError("知识点不属于指定项目")
     prompt = f"""请为以下知识点出 {count} 道测验题。
 题型偏好：{qtype}
 
@@ -100,9 +105,17 @@ def generate_quiz(
     session.add(quiz)
     session.flush()
 
-    for q in questions:
+    for index, q in enumerate(questions):
+        requested_node_id = q.get("node_id")
+        try:
+            node_id = int(requested_node_id)
+        except (TypeError, ValueError):
+            node_id = None
+        if node_id not in allowed_node_ids:
+            node_id = nodes[index % len(nodes)].id
         qq = QuizQuestion(
             quiz_id=quiz.id,
+            node_id=node_id,
             qtype=q.get("qtype", "short"),
             stem=q.get("stem", ""),
             options=json.dumps(q.get("options", []), ensure_ascii=False),
