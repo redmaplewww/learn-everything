@@ -10,6 +10,10 @@
 
 本 PR 将运行路径统一为 Next.js + FastAPI，同时继续复用 Kotaemon 的 SQLite、LLM 和 RAG 基础设施。项目侧 Gradio 入口已删除。
 
+## 前端效果
+
+![Next.js 学习工作台](https://raw.githubusercontent.com/Aeside1/learn-everything/feature/nextjs-fastapi-migration/docs/assets/pr-frontend-workbench.png)
+
 ## 架构调整
 
 ```text
